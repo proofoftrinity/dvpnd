@@ -166,6 +166,15 @@ the tunnel keeps its MTU), and four message type values replacing WireGuard's (`
 Clients receive `s1`–`s4`, `h1`–`h4` and any signature packets `i1`–`i5` in the handshake and
 must match them. This default tier is what every client app speaks today.
 
+Each tier hands its clients addresses from tunnel subnets of its own, which the node derives
+from that tier's `private_key`: a `10.x.y.0/24` (x from 11 to 250) and an IPv6 unique local
+`/120`, the same on every start and different from node to node. A node that handed every
+client an address in `10.8.0.0/24`, the subnet most WireGuard servers use, failed the
+network's health probe. Leave `ipv4_subnet` and `ipv6_subnet` empty unless a derived subnet
+clashes with a network the host is on; then set a private network in CIDR form (IPv4 `/16`
+to `/28`, IPv6 `/64` to `/124`). The two tiers' subnets must not overlap. A file written
+before these settings existed gets the derived subnets.
+
 The `[v3]` section is a second interface (`awg1`, its own `listen_port` and keys) speaking
 AmneziaWG 3.1: header protection, random trailers, content padding, MTU 1280. Only a client
 that asks for it in the handshake lands there; every other client gets the default tier,

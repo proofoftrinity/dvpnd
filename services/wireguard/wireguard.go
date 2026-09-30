@@ -79,6 +79,14 @@ func NewVariant(variant Variant, pool *wgtypes.IPPool) *WireGuard {
 	}
 }
 
+// WithPool replaces the tunnel address pool; a variant whose networks come
+// from its configuration sets it before Init.
+func (s *WireGuard) WithPool(pool *wgtypes.IPPool) *WireGuard {
+	s.pool = pool
+
+	return s
+}
+
 // WithConfig makes Init use this configuration, and these extra [Interface]
 // lines, instead of reading wireguard.toml.
 func (s *WireGuard) WithConfig(config *wgtypes.Config, extra []string) *WireGuard {

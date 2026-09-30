@@ -66,9 +66,22 @@ func run(home, out, endpoint string, v3 bool) error {
 		fmt.Println("stopping:", s.Stop())
 	}()
 
+	// Each tier's gateway is the first host of its tunnel network, which the
+	// node derives from the tier's key; the clients ping it through the tunnel.
+	def, netV3, err := cfg.TunnelNetworks()
+	if err != nil {
+		return err
+	}
+	gateways := map[int]string{2: gateway(def)}
 	tiers := []int{2}
 	if v3 {
+		gateways[3] = gateway(netV3)
 		tiers = append(tiers, 3)
+	}
+	for tier, gw := range gateways {
+		if err := os.WriteFile(filepath.Join(out, fmt.Sprintf("gateway%d", tier)), []byte(gw), 0o644); err != nil {
+			return err
+		}
 	}
 	for _, tier := range tiers {
 		priv, err := wgtypes.NewPrivateKey()
@@ -94,7 +107,7 @@ func run(home, out, endpoint string, v3 bool) error {
 		raw, _ := json.Marshal(payload)
 		fmt.Printf("tier %d payload: %s\n", tier, raw)
 
-		conf, err := clientConf(raw, priv.String(), endpoint)
+		conf, err := clientConf(raw, priv.String(), endpoint, gateways)
 		if err != nil {
 			return err
 		}
@@ -123,10 +136,15 @@ func run(home, out, endpoint string, v3 bool) error {
 	}
 }
 
+// gateway is the node's own address on a tier's IPv4 tunnel network.
+func gateway(n awgtypes.Networks) string {
+	return wgtypes.NewIPv4FromIP(n.IPv4.IP).Next().IP().String()
+}
+
 // clientConf writes the awg-quick configuration a client app would, from the
 // handshake payload: its own junk counts, the node's prefixes, headers and
 // signature packets, and for the 3.1 tier the key, trailers and MTU.
-func clientConf(payload []byte, privateKey, endpoint string) (string, error) {
+func clientConf(payload []byte, privateKey, endpoint string, gateways map[int]string) (string, error) {
 	var p struct {
 		Addrs    []string                 `json:"addrs"`
 		Metadata []map[string]interface{} `json:"metadata"`
@@ -160,8 +178,12 @@ func clientConf(payload []byte, privateKey, endpoint string) (string, error) {
 		fmt.Fprintf(&b, "MTU = %s\nHeaderProtectionKey = %s\nRandomTrailers = %s\nContentPaddingAddition = 0-32\n",
 			num("mtu"), m["header_protection_key"], trailers)
 	}
-	fmt.Fprintf(&b, "\n[Peer]\nPublicKey = %s\nAllowedIPs = 10.8.0.1/32, 10.9.0.1/32, 1.1.1.1/32\nEndpoint = %s:%s\nPersistentKeepalive = 15\n",
-		m["public_key"], endpoint, num("port"))
+	allowed := []string{"1.1.1.1/32"}
+	for _, gw := range gateways {
+		allowed = append(allowed, gw+"/32")
+	}
+	fmt.Fprintf(&b, "\n[Peer]\nPublicKey = %s\nAllowedIPs = %s\nEndpoint = %s:%s\nPersistentKeepalive = 15\n",
+		m["public_key"], strings.Join(allowed, ", "), endpoint, num("port"))
 
 	return b.String(), nil
 }

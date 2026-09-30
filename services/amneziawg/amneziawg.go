@@ -62,47 +62,52 @@ type AmneziaWG struct {
 	v3Net  *net.IPNet
 	config *awgtypes.Config
 	asked  *tierRequests
+	// preset pools, when set, replace the tunnel networks Init would take
+	// from amneziawg.toml.
+	pool, poolV3 *wgtypes.IPPool
 }
 
-// NewAmneziaWG builds the service over the tunnel address pools of the two
-// tiers.
+// NewAmneziaWG builds the service. Nil pools, as a node uses, mean each tier
+// gets the tunnel networks its configuration names or its key derives; tests
+// pass fixed ones.
 func NewAmneziaWG(pool, poolV3 *wgtypes.IPPool) *AmneziaWG {
 	return &AmneziaWG{
 		WireGuard: wireguard.NewVariant(Variant, pool),
 		v3:        wireguard.NewVariant(Variant, poolV3),
-		v3Net:     poolV3.V4.Net,
 		config:    awgtypes.NewConfig(),
 		asked:     newTierRequests(),
+		pool:      pool,
+		poolV3:    poolV3,
 	}
 }
 
 // NewService builds the AmneziaWG service for a node.
 func NewService(_ *types.Config) (types.Service, error) {
-	pool, err := newPool(types.IPv4CIDR, types.IPv6CIDR)
-	if err != nil {
-		return nil, err
-	}
-
-	poolV3, err := newPool(awgtypes.V3IPv4CIDR, awgtypes.V3IPv6CIDR)
-	if err != nil {
-		return nil, err
-	}
-
-	return NewAmneziaWG(pool, poolV3), nil
+	return NewAmneziaWG(nil, nil), nil
 }
 
-func newPool(v4, v6 string) (*wgtypes.IPPool, error) {
-	ipv4Pool, err := wgtypes.NewIPv4PoolFromCIDR(v4)
-	if err != nil {
-		return nil, err
+// usePools hands each tier its address pool: the preset ones, or pools over
+// the tunnel networks of the configuration.
+func (s *AmneziaWG) usePools() error {
+	pool, poolV3 := s.pool, s.poolV3
+	if pool == nil {
+		def, v3, err := s.config.TunnelNetworks()
+		if err != nil {
+			return err
+		}
+		pool = def.Pool()
+		if s.v3On() {
+			poolV3 = v3.Pool()
+		}
 	}
 
-	ipv6Pool, err := wgtypes.NewIPv6PoolFromCIDR(v6)
-	if err != nil {
-		return nil, err
+	s.WireGuard.WithPool(pool)
+	if poolV3 != nil {
+		s.v3.WithPool(poolV3)
+		s.v3Net = poolV3.V4.Net
 	}
 
-	return wgtypes.NewIPPool(ipv4Pool, ipv6Pool), nil
+	return nil
 }
 
 // Command is the "amneziawg config …" CLI subtree.
@@ -133,6 +138,9 @@ func (s *AmneziaWG) Init(home string) (err error) {
 		return err
 	}
 	if err = s.config.Validate(); err != nil {
+		return err
+	}
+	if err = s.usePools(); err != nil {
 		return err
 	}
 

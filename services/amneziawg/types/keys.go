@@ -18,11 +18,6 @@ const (
 
 	// V3Interface is the 3.1 tier's interface; the default tier keeps awg0.
 	V3Interface = "awg1"
-	// V3IPv4CIDR and V3IPv6CIDR are the tunnel address pools of the 3.1
-	// tier: its own subnets, so a peer's tunnel address says which
-	// interface it sits on.
-	V3IPv4CIDR = "10.9.0.2/24"
-	V3IPv6CIDR = "fd86:ea04:1116::2/120"
 	// V3MTU is the tunnel MTU of the 3.1 tier, which Amnezia recommends for
 	// it: the prefixes, trailers and padding of every packet need the room.
 	V3MTU = 1280

@@ -156,6 +156,15 @@ not sent; the node sends few and small ones. Validation mirrors what clients che
 within a datagram, `s1 + 56 != s2`, headers all distinct and above 4 (or all zero). The
 public listing carries one blank entry per tier, with its `awg_version`.
 
+Tunnel subnets are per node, not WireGuard's fixed `10.8.0.0/24`: a node whose AmneziaWG
+clients all got `10.8.0.x` failed the network's health probe (which fetches the root
+document, sends the handshake and opens no tunnel), and passed once the same reply carried
+an address from another subnet; nodes on the network hand out addresses from subnets of
+their own. Each tier derives a `10.x.y.0/24` (x from 11 to 250, so 10.0–10.10 stay clear)
+and a unique local `/120` from SHA-256 of a fixed label and its public key, so they survive
+restarts; `ipv4_subnet` and `ipv6_subnet` override them. A derived 3.1 subnet that meets the
+default tier's moves to the next `/24`.
+
 **Two tiers, one engine.** AmneziaWG versions differ on the wire: 1.0 replaced the four
 message type values and prefixed the two handshake messages with junk, 1.5 added the
 signature packets, 2.0 added prefixes on cookie and transport packets and header ranges, and
@@ -172,8 +181,7 @@ node runs one engine and offers two parameter tiers on two interfaces:
   (they cost tunnel MTU), optional signature packets. Every client engine from AmneziaWG
   1.0 up accepts it, current apps get it without asking, and it never changes: the apps
   must keep working against every node on the network, whichever software runs it.
-- The 3.1 tier (`awg1`, `[v3]`: its own port, keys and subnets 10.9.0.0/24 and
-  fd86:ea04:1116::/120): header protection, `s1`–`s4` of at least 12, random trailers, a
+- The 3.1 tier (`awg1`, `[v3]`: its own port, keys and tunnel subnets): header protection, `s1`–`s4` of at least 12, random trailers, a
   little content padding and MTU 1280 (Amnezia's recommendation for 3.1). Only a client
   that sends `awg_version: 3` in its peer request lands on it, and the tunnel address a
   peer was assigned says which tier it is on. The extra keys are named after the engine's

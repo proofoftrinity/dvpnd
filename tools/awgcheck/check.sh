@@ -68,10 +68,15 @@ run_case() { # name image conf gateway expect(ok|fail)
     fail) echo "$out" | grep -q "RESULT: awg-quick up FAILED" || { echo "UNEXPECTED: this pairing should not come up"; failed=1; } ;;
   esac
 }
-run_case "A: the apps' engine ($APP_GO_TAG, tools $APP_TOOLS_TAG) on the default tier" awgcheck-client:app client2.conf 10.8.0.1 ok
-run_case "B: the 3.1 engine ($NEW_GO_TAG, tools $NEW_TOOLS_TAG) on the 3.1 tier" awgcheck-client:new client3.conf 10.9.0.1 ok
-run_case "C: the 3.1 engine on the default tier" awgcheck-client:new client2.conf 10.8.0.1 ok
-run_case "D: the apps' engine on the 3.1 tier (must fail: it does not know the keys)" awgcheck-client:app client3.conf 10.9.0.1 fail
+# The node derives each tier's tunnel network from its key and writes the
+# gateway addresses next to the client configurations.
+GW2="$(cat "$WORK/out/gateway2")"
+GW3="$(cat "$WORK/out/gateway3")"
+echo "== tunnel gateways: default tier $GW2, 3.1 tier $GW3"
+run_case "A: the apps' engine ($APP_GO_TAG, tools $APP_TOOLS_TAG) on the default tier" awgcheck-client:app client2.conf "$GW2" ok
+run_case "B: the 3.1 engine ($NEW_GO_TAG, tools $NEW_TOOLS_TAG) on the 3.1 tier" awgcheck-client:new client3.conf "$GW3" ok
+run_case "C: the 3.1 engine on the default tier" awgcheck-client:new client2.conf "$GW2" ok
+run_case "D: the apps' engine on the 3.1 tier (must fail: it does not know the keys)" awgcheck-client:app client3.conf "$GW3" fail
 
 echo; echo "== node-side counters"
 docker logs awgcheck-node 2>&1 | grep '^peer' | tail -2

@@ -5,6 +5,8 @@ package amneziawg
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -56,6 +58,8 @@ func setup(t *testing.T) (string, *awgtypes.Config, *AmneziaWG) {
 	return confDir, cfg, newService(t)
 }
 
+// newService builds the service over fixed pools, so payloads in the tests
+// carry known addresses.
 func newService(t *testing.T) *AmneziaWG {
 	t.Helper()
 
@@ -63,12 +67,26 @@ func newService(t *testing.T) *AmneziaWG {
 	if err != nil {
 		t.Fatal(err)
 	}
-	poolV3, err := newPool(awgtypes.V3IPv4CIDR, awgtypes.V3IPv6CIDR)
+	poolV3, err := newPool("10.9.0.2/24", "fd86:ea04:1116::2/120")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	return NewAmneziaWG(pool, poolV3)
+}
+
+func newPool(v4, v6 string) (*wgtypes.IPPool, error) {
+	ipv4Pool, err := wgtypes.NewIPv4PoolFromCIDR(v4)
+	if err != nil {
+		return nil, err
+	}
+
+	ipv6Pool, err := wgtypes.NewIPv6PoolFromCIDR(v6)
+	if err != nil {
+		return nil, err
+	}
+
+	return wgtypes.NewIPPool(ipv4Pool, ipv6Pool), nil
 }
 
 // home writes cfg as amneziawg.toml under a fresh directory and returns it.
@@ -176,6 +194,76 @@ func TestInitWritesInterfaceConfigs(t *testing.T) {
 	}
 	if s.Config().Interface != "awg0" || s.v3.Config().Interface != "awg1" {
 		t.Fatalf("interfaces: %s, %s", s.Config().Interface, s.v3.Config().Interface)
+	}
+}
+
+// A node's service has no preset pools: each tier runs on the networks its
+// key derives, and a peer's address still says which tier it is on.
+func TestInitDerivesTunnelNetworks(t *testing.T) {
+	withFakeAwg(t)
+	confDir, cfg, _ := setup(t)
+	s := NewAmneziaWG(nil, nil)
+	if err := s.Init(home(t, cfg)); err != nil {
+		t.Fatal(err)
+	}
+
+	def, v3, err := cfg.TunnelNetworks()
+	if err != nil {
+		t.Fatal(err)
+	}
+	host := func(n *net.IPNet, step int) string {
+		if v4 := n.IP.To4(); v4 != nil {
+			ip := wgtypes.NewIPv4FromIP(v4)
+			for i := 0; i < step; i++ {
+				ip = ip.Next()
+			}
+			return ip.IP().String()
+		}
+		ip := wgtypes.NewIPv6FromIP(n.IP)
+		for i := 0; i < step; i++ {
+			ip = ip.Next()
+		}
+		return ip.IP().String()
+	}
+
+	for file, n := range map[string]awgtypes.Networks{"awg0.conf": def, "awg1.conf": v3} {
+		want := "Address = " + host(n.IPv4, 1) + "/24," + host(n.IPv6, 1) + "/120"
+		if out := readFile(t, filepath.Join(confDir, file)); !strings.Contains(out, want) {
+			t.Errorf("%s lacks %q:\n%s", file, want, out)
+		}
+		if strings.HasPrefix(n.IPv4.String(), "10.8.") || strings.HasPrefix(n.IPv4.String(), "10.9.") {
+			t.Errorf("%s runs on %s", file, n.IPv4)
+		}
+	}
+
+	for _, tc := range []struct {
+		req  string
+		net  awgtypes.Networks
+		tier string
+	}{
+		{`{"public_key":"%s"}`, def, "default"},
+		{`{"public_key":"%s","awg_version":3}`, v3, "3.1"},
+	} {
+		key := newKey(t)
+		data, err := s.ParsePeerRequest([]byte(fmt.Sprintf(tc.req, key.String())))
+		if err != nil {
+			t.Fatal(err)
+		}
+		res, err := s.AddPeer(data)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := net.IP(res[:4]).String(); got != host(tc.net.IPv4, 2) {
+			t.Fatalf("%s tier peer got %s, want %s", tc.tier, got, host(tc.net.IPv4, 2))
+		}
+		payload, err := s.HandshakePayload(res)
+		if err != nil {
+			t.Fatal(err)
+		}
+		out, _ := json.Marshal(payload)
+		if strings.Contains(string(out), `"awg_version":3`) != (tc.tier == "3.1") {
+			t.Fatalf("%s tier payload: %s", tc.tier, out)
+		}
 	}
 }
 
