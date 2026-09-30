@@ -145,7 +145,7 @@ func TestInitRendersConfig(t *testing.T) {
 	if strings.Contains(out, "bandwidth:") {
 		t.Error("bandwidth must be omitted when unset")
 	}
-	if s.ListenPort() != 4443 || s.info[2] != 1 || len(s.TLSPin()) != 64 {
+	if s.ListenPort() != 4443 || s.info[2] != 1 || len(s.TLSPin()) != 95 {
 		t.Fatalf("info %x pin %q", s.info, s.TLSPin())
 	}
 
@@ -339,8 +339,7 @@ func TestHandshakePayload(t *testing.T) {
 		t.Fatal(err)
 	}
 	out, _ := json.Marshal(payload)
-	want := `{"metadata":[{"port":4443,"proxy_protocol":0,"transport_protocol":0,"transport_security":2,"tls_pin":"` +
-		s.TLSPin() + `","obfs_password":"salt"}]}`
+	want := `{"metadata":[{"port":4443,"tls_pin":"` + s.TLSPin() + `","obfs_password":"salt"}]}`
 	if string(out) != want {
 		t.Fatalf("payload:\n got %s\nwant %s", out, want)
 	}

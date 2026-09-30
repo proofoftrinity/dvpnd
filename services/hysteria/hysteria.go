@@ -106,8 +106,8 @@ func (s *Hysteria) Info() []byte {
 	return s.info
 }
 
-// TLSPin is the hex SHA-256 of the node's certificate; clients refuse to
-// connect without it.
+// TLSPin is the SHA-256 of the node's certificate in colon-separated hex, as
+// Hysteria2 nodes on the network send it; clients refuse to connect without it.
 func (s *Hysteria) TLSPin() string {
 	return s.tlsPin
 }
@@ -137,10 +137,11 @@ func (s *Hysteria) Init(home string) (err error) {
 		TLSKeyPath:  filepath.Join(home, "tls.key"),
 	}
 
-	s.tlsPin, err = common.CertificatePin(data.TLSCertPath)
+	pin, err := common.CertificatePin(data.TLSCertPath)
 	if err != nil {
 		return err
 	}
+	s.tlsPin = common.ColonPin(pin)
 	if _, err = os.Stat(data.TLSKeyPath); err != nil {
 		return fmt.Errorf("tls key: %w", err)
 	}

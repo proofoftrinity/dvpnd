@@ -9,6 +9,7 @@ import (
 	"encoding/pem"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -46,5 +47,10 @@ func TestSelfSignedCertificateAndPin(t *testing.T) {
 
 	if _, err := CertificatePin(filepath.Join(t.TempDir(), "missing")); err == nil {
 		t.Fatal("missing file accepted")
+	}
+
+	colon := ColonPin(pin)
+	if len(colon) != 95 || strings.ReplaceAll(colon, ":", "") != pin || colon[2] != ':' {
+		t.Fatalf("colon pin = %s", colon)
 	}
 }

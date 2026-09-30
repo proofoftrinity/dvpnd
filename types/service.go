@@ -55,9 +55,6 @@ type Inbound struct {
 	RealityShortID     string `json:"reality_short_id,omitempty"`
 	RealityPublicKey   string `json:"reality_public_key,omitempty"`
 	RealityFingerprint string `json:"reality_fingerprint,omitempty"`
-
-	// Salamander obfuscation password (Hysteria2 nodes), handshake only.
-	ObfsPassword string `json:"obfs_password,omitempty"`
 }
 
 const (

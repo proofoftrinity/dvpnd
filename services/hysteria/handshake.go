@@ -53,17 +53,26 @@ func (s *Hysteria) ParsePeerRequest(raw []byte) ([]byte, error) {
 
 // HandshakePayloadData is what a Hysteria2 client receives in result.data.
 type HandshakePayloadData struct {
-	Metadata []types.Inbound `json:"metadata"`
+	Metadata []Inbound `json:"metadata"`
+}
+
+// Inbound is the Hysteria2 handshake entry: exactly the keys, and the pin
+// format, that Hysteria2 nodes on the network send. The network's health
+// probe failed the handshake while the entry carried three more keys and a
+// plain-hex pin.
+type Inbound struct {
+	Port         uint16 `json:"port"`
+	TLSPin       string `json:"tls_pin"`
+	ObfsPassword string `json:"obfs_password"`
 }
 
 // HandshakePayload gives the client the port, the certificate pin it must
-// verify, and the obfuscation password when one is set.
+// verify, and the obfuscation password (empty when obfuscation is off).
 func (s *Hysteria) HandshakePayload(_ []byte) (interface{}, error) {
-	return HandshakePayloadData{Metadata: []types.Inbound{{
-		Port:              s.ListenPort(),
-		TransportSecurity: types.TransportSecurityTLS,
-		TLSPin:            s.tlsPin,
-		ObfsPassword:      s.config.Server.ObfsPassword,
+	return HandshakePayloadData{Metadata: []Inbound{{
+		Port:         s.ListenPort(),
+		TLSPin:       s.tlsPin,
+		ObfsPassword: s.config.Server.ObfsPassword,
 	}}}, nil
 }
 
