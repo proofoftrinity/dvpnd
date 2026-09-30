@@ -4,7 +4,11 @@
 # The node runs as root: a WireGuard node creates the tunnel interface and the
 # NAT rules; a V2Ray node needs no privilege beyond binding its port but the
 # unit is shared. On SIGTERM the node stops its VPN service itself (tunnel
-# down, rules removed, proxy child exited) before exiting.
+# down, rules removed, proxy child exited) before exiting. KillMode=mixed sends
+# that SIGTERM to the node alone: with the default, systemd signals the whole
+# control group, a userspace tunnel (amneziawg-go) exits before the node can
+# take it down, its PostDown never runs and the NAT rules outlive the node.
+# Whatever is still running once the node has exited is killed.
 [Unit]
 Description=dvpnd - dVPN node for the Sentinel network
 After=network-online.target
@@ -15,6 +19,7 @@ Type=simple
 User=root
 Environment=HOME=/root
 ExecStart=/usr/local/bin/dvpnd start --home /root/.dvpnd
+KillMode=mixed
 Restart=always
 RestartSec=15
 LimitNOFILE=65536
