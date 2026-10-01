@@ -448,7 +448,8 @@ fi
 
 # ---------------------------------------------------------------- summary
 
-read -r _ OPERATOR_ADDR NODE_ADDR < <(dv keys show "${KEY_NAME}" | awk 'NR == 2')
+# `keys show` prints Name, Address (sentnode1...), Operator (sent1...).
+read -r _ NODE_ADDR OPERATOR_ADDR < <(dv keys show "${KEY_NAME}" | awk 'NR == 2')
 
 cat <<EOF
 
