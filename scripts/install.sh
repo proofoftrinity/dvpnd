@@ -37,6 +37,7 @@ AWG_TOOLS_COMMIT="ee0f0a9aa34ff0a0da4b3433b9512781cfe02843"
 
 # Defaults, all overridable with flags.
 NODE_TYPE="wireguard"
+TYPE_GIVEN=0
 MONIKER=""
 GIGABYTE_PRICES="40000000udvpn"
 HOURLY_PRICES="97500000udvpn"
@@ -60,7 +61,8 @@ usage() {
 Usage: sudo bash install.sh [options]
 
 Options:
-  --type TYPE           wireguard (default), amneziawg, openvpn, v2ray, xray, hysteria2
+  --type TYPE           wireguard, amneziawg, openvpn, v2ray, xray, hysteria2
+                        (default: the existing node's type, else wireguard)
   --moniker NAME        public name of the node, 4-32 characters (asked if missing)
   --gigabyte-price P    price per GB, e.g. ${GIGABYTE_PRICES} (default)
   --hourly-price P      price per hour, e.g. ${HOURLY_PRICES} (default)
@@ -86,7 +88,7 @@ die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --type) NODE_TYPE="$2"; shift 2 ;;
+    --type) NODE_TYPE="$2"; TYPE_GIVEN=1; shift 2 ;;
     --moniker) MONIKER="$2"; shift 2 ;;
     --gigabyte-price) GIGABYTE_PRICES="$2"; shift 2 ;;
     --hourly-price) HOURLY_PRICES="$2"; shift 2 ;;
@@ -106,6 +108,21 @@ while [[ $# -gt 0 ]]; do
     *) die "unknown option: $1 (see --help)" ;;
   esac
 done
+
+# On an existing node the type comes from its configuration, so a re-run (an
+# upgrade, or a move with the home directory copied over) installs the packages
+# that node needs and keeps its protocol file, without --type being repeated.
+# Switching to another type rewrites config.toml, so it takes --force.
+if [[ -f "${NODE_HOME}/config.toml" ]]; then
+  existing_type=$(awk -F '[="]' '{ gsub(/ /, "") } /^\[node\]/ { f = 1 } f && /^type/ { print $3; exit }' "${NODE_HOME}/config.toml")
+  if [[ -n "${existing_type}" ]]; then
+    if [[ "${TYPE_GIVEN}" -eq 0 ]]; then
+      NODE_TYPE="${existing_type}"
+    elif [[ "${NODE_TYPE}" != "${existing_type}" && "${FORCE}" -eq 0 ]]; then
+      die "this is a ${existing_type} node; to switch it to ${NODE_TYPE}, add --force (it rewrites config.toml: pass --moniker and your prices again)"
+    fi
+  fi
+fi
 
 case "${NODE_TYPE}" in
   wireguard|amneziawg|openvpn|v2ray|xray|hysteria2) ;;
