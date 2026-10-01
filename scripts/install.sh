@@ -490,7 +490,10 @@ What to do now:
    report is a transaction that costs gas; the node cannot register until the
    wallet holds some. Until then it retries and the log shows the error.
 EOF
+# Step 2 exists only behind a router; the steps after it follow on from 1 or 2.
+step=2
 if [[ "${BEHIND_NAT}" -eq 1 ]]; then
+  step=3
   cat <<EOF
 
 2. On your router, forward these ports to ${LOCAL_IP} (this machine):
@@ -507,10 +510,10 @@ EOF
 fi
 cat <<EOF
 
-3. Watch the log until you see the node register and go active:
+${step}. Watch the log until you see the node register and go active:
      journalctl -u dvpnd -f
 
-4. Check that the node answers from outside your network, for example from a
+$((step + 1)). Check that the node answers from outside your network, for example from a
    phone on mobile data:
      https://${PUBLIC_IP}:${API_PORT}/status
    (the browser warns about the self-signed certificate; that is expected).
