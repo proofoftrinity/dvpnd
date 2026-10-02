@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"text/template"
 	"time"
 
@@ -58,7 +59,9 @@ type XRay struct {
 	config  *xraytypes.Config
 	peers   *common.PeerSet
 	tlsPin  string
-	conn    *grpc.ClientConn
+
+	connMu sync.Mutex // guards conn: handshakes and the jobs call the API at once
+	conn   *grpc.ClientConn
 }
 
 func NewXRay() *XRay {
@@ -160,10 +163,12 @@ func (s *XRay) Start() (err error) {
 
 // Stop asks the proxy to exit and waits for it, killing it after stopTimeout.
 func (s *XRay) Stop() error {
+	s.connMu.Lock()
 	if s.conn != nil {
 		_ = s.conn.Close()
 		s.conn = nil
 	}
+	s.connMu.Unlock()
 
 	return s.process.Stop(stopTimeout)
 }
@@ -172,6 +177,9 @@ func (s *XRay) Stop() error {
 // first use. grpc.NewClient does not connect until a call is made, so a call's
 // context bounds the wait for the proxy to come up.
 func (s *XRay) clientConn() (*grpc.ClientConn, error) {
+	s.connMu.Lock()
+	defer s.connMu.Unlock()
+
 	if s.conn != nil {
 		return s.conn, nil
 	}

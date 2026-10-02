@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"text/template"
 	"time"
 
@@ -46,6 +47,9 @@ type V2Ray struct {
 	config  *v2raytypes.Config
 	peers   *v2raytypes.Peers
 	tlsPin  string
+
+	connMu sync.Mutex // guards conn: handshakes and the jobs call the API at once
+	conn   *grpc.ClientConn
 }
 
 // binaryName is the proxy binary looked up on PATH; a variable so tests can
@@ -55,6 +59,10 @@ var binaryName = "v2ray"
 // stopTimeout is how long Stop waits for the child to exit after SIGTERM
 // before killing it.
 var stopTimeout = 5 * time.Second
+
+// rpcTimeout bounds every call to the proxy's control API, so a proxy that
+// does not answer cannot hold a handshake or a job forever.
+var rpcTimeout = 10 * time.Second
 
 func NewV2Ray() *V2Ray {
 	return &V2Ray{
@@ -152,36 +160,59 @@ func (s *V2Ray) Start() (err error) {
 
 // Stop asks the proxy to exit and waits for it, killing it after stopTimeout.
 func (s *V2Ray) Stop() error {
+	s.connMu.Lock()
+	if s.conn != nil {
+		_ = s.conn.Close()
+		s.conn = nil
+	}
+	s.connMu.Unlock()
+
 	return s.process.Stop(stopTimeout)
 }
 
+// clientConn returns the connection to the proxy's control API, opened on
+// first use. grpc.NewClient does not connect until a call is made, so a
+// call's context bounds the wait for the proxy to come up.
 func (s *V2Ray) clientConn() (*grpc.ClientConn, error) {
-	target := fmt.Sprintf("127.0.0.1:%d", s.config.API.Port)
-	return grpc.Dial(
-		target,
-		grpc.WithBlock(),
+	s.connMu.Lock()
+	defer s.connMu.Unlock()
+
+	if s.conn != nil {
+		return s.conn, nil
+	}
+
+	conn, err := grpc.NewClient(
+		fmt.Sprintf("127.0.0.1:%d", s.config.API.Port),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
+	if err != nil {
+		return nil, err
+	}
+	s.conn = conn
+
+	return conn, nil
 }
 
-func (s *V2Ray) handlerServiceClient() (*grpc.ClientConn, proxymancommand.HandlerServiceClient, error) {
-	conn, err := s.clientConn()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	client := proxymancommand.NewHandlerServiceClient(conn)
-	return conn, client, nil
+func rpcContext() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), rpcTimeout)
 }
 
-func (s *V2Ray) statsServiceClient() (*grpc.ClientConn, statscommand.StatsServiceClient, error) {
+func (s *V2Ray) handlerServiceClient() (proxymancommand.HandlerServiceClient, error) {
 	conn, err := s.clientConn()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	client := statscommand.NewStatsServiceClient(conn)
-	return conn, client, nil
+	return proxymancommand.NewHandlerServiceClient(conn), nil
+}
+
+func (s *V2Ray) statsServiceClient() (statscommand.StatsServiceClient, error) {
+	conn, err := s.clientConn()
+	if err != nil {
+		return nil, err
+	}
+
+	return statscommand.NewStatsServiceClient(conn), nil
 }
 
 func (s *V2Ray) AddPeer(data []byte) (result []byte, err error) {
@@ -189,16 +220,10 @@ func (s *V2Ray) AddPeer(data []byte) (result []byte, err error) {
 		return nil, errors.New("data length must be 17 bytes")
 	}
 
-	conn, client, err := s.handlerServiceClient()
+	client, err := s.handlerServiceClient()
 	if err != nil {
 		return nil, err
 	}
-
-	defer func() {
-		if err = conn.Close(); err != nil {
-			panic(err)
-		}
-	}()
 
 	var (
 		email  = base64.StdEncoding.EncodeToString(data)
@@ -219,7 +244,10 @@ func (s *V2Ray) AddPeer(data []byte) (result []byte, err error) {
 		),
 	}
 
-	_, err = client.AlterInbound(context.TODO(), req)
+	ctx, cancel := rpcContext()
+	defer cancel()
+
+	_, err = client.AlterInbound(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -247,16 +275,10 @@ func (s *V2Ray) RemovePeer(data []byte) error {
 		return errors.New("data length must be 17 bytes")
 	}
 
-	conn, client, err := s.handlerServiceClient()
+	client, err := s.handlerServiceClient()
 	if err != nil {
 		return err
 	}
-
-	defer func() {
-		if err = conn.Close(); err != nil {
-			panic(err)
-		}
-	}()
 
 	var (
 		email = base64.StdEncoding.EncodeToString(data)
@@ -272,7 +294,10 @@ func (s *V2Ray) RemovePeer(data []byte) error {
 		),
 	}
 
-	_, err = client.AlterInbound(context.TODO(), req)
+	ctx, cancel := rpcContext()
+	defer cancel()
+
+	_, err = client.AlterInbound(ctx, req)
 	if err != nil {
 		if !strings.Contains(err.Error(), "not found") {
 			return err
@@ -285,25 +310,22 @@ func (s *V2Ray) RemovePeer(data []byte) error {
 }
 
 func (s *V2Ray) Peers() (items []types.Peer, err error) {
-	conn, client, err := s.statsServiceClient()
+	client, err := s.statsServiceClient()
 	if err != nil {
 		return nil, err
 	}
 
-	defer func() {
-		if err = conn.Close(); err != nil {
-			panic(err)
-		}
-	}()
-
 	err = s.peers.Iterate(
 		func(key string, _ v2raytypes.Peer) (bool, error) {
+			ctx, cancel := rpcContext()
+			defer cancel()
+
 			req := &statscommand.GetStatsRequest{
 				Reset_: false,
 				Name:   fmt.Sprintf("user>>>%s>>>traffic>>>uplink", key),
 			}
 
-			res, err := client.GetStats(context.TODO(), req)
+			res, err := client.GetStats(ctx, req)
 			if err != nil {
 				if !strings.Contains(err.Error(), "not found") {
 					return false, err
@@ -320,7 +342,7 @@ func (s *V2Ray) Peers() (items []types.Peer, err error) {
 				Name:   fmt.Sprintf("user>>>%s>>>traffic>>>downlink", key),
 			}
 
-			res, err = client.GetStats(context.TODO(), req)
+			res, err = client.GetStats(ctx, req)
 			if err != nil {
 				if !strings.Contains(err.Error(), "not found") {
 					return false, err
