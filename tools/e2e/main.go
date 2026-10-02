@@ -8,7 +8,9 @@
 //	go run ./tools/e2e -home ~/.dvpnd-test -api https://127.0.0.1:8585
 //
 // It spends real funds (the session deposit plus gas) on the chain the node is
-// configured for.
+// configured for. With -node it buys the session on another node instead (any
+// sentnode address, with -api pointing at that node's API); the key then only
+// pays and signs.
 package main
 
 import (
@@ -51,16 +53,18 @@ func main() {
 		out        = flag.String("out", "", "where to write the WireGuard client config (default <home>/e2e-client.conf)")
 		endpoint   = flag.String("endpoint", "127.0.0.1", "host written as the WireGuard endpoint in the client config")
 		fullTunnel = flag.Bool("full-tunnel", false, "route all client traffic through the node (0.0.0.0/0, ::/0) instead of only its tunnel address")
-		nodeType   = flag.String("type", "wireguard", "node type to handshake as: wireguard writes a client config; v2ray, xray, hysteria2 and openvpn write the decoded handshake payload")
+		nodeType   = flag.String("type", "wireguard", "node type to handshake as: wireguard and amneziawg write a client config; v2ray, xray, hysteria2 and openvpn write the decoded handshake payload")
+		nodeStr    = flag.String("node", "", "sentnode address of the node to buy the session on (default: the key's own node)")
+		awgVersion = flag.Int("awg-version", 0, "amneziawg only: the tier to ask for (0 = the default tier, 3 = the 3.1 tier)")
 	)
 	flag.Parse()
-	if err := run(*home, *api, *gigabytes, *maxPrice, *sessionID, *out, *deactivate, *endpoint, *fullTunnel, *nodeType); err != nil {
+	if err := run(*home, *api, *gigabytes, *maxPrice, *sessionID, *out, *deactivate, *endpoint, *fullTunnel, *nodeType, *nodeStr, *awgVersion); err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
 	}
 }
 
-func run(home, api string, gigabytes int64, maxPriceStr string, sessionID uint64, out string, deactivate bool, endpoint string, fullTunnel bool, nodeType string) error {
+func run(home, api string, gigabytes int64, maxPriceStr string, sessionID uint64, out string, deactivate bool, endpoint string, fullTunnel bool, nodeType, nodeStr string, awgVersion int) error {
 	base.GetConfig().Seal()
 
 	v := viper.New()
@@ -83,6 +87,14 @@ func run(home, api string, gigabytes int64, maxPriceStr string, sessionID uint64
 		return err
 	}
 	nodeAddr := base.NodeAddress(accAddr.Bytes())
+	if nodeStr != "" {
+		if deactivate {
+			return fmt.Errorf("-deactivate acts on the key's own node; drop -node")
+		}
+		if nodeAddr, err = base.NodeAddressFromBech32(nodeStr); err != nil {
+			return fmt.Errorf("-node: %w", err)
+		}
+	}
 	fmt.Printf("account %s\nnode    %s\n", accAddr, nodeAddr)
 
 	client := lite.NewDefaultClient().
@@ -176,7 +188,7 @@ func run(home, api string, gigabytes int64, maxPriceStr string, sessionID uint64
 	if err != nil {
 		return err
 	}
-	peerJSON, clientSecret, err := peerRequest(nodeType, wgKey)
+	peerJSON, clientSecret, err := peerRequest(nodeType, wgKey, awgVersion)
 	if err != nil {
 		return err
 	}
@@ -213,6 +225,10 @@ func run(home, api string, gigabytes int64, maxPriceStr string, sessionID uint64
 	dataJSON, err := base64.StdEncoding.DecodeString(envelope.Result.Data)
 	if err != nil {
 		return err
+	}
+
+	if nodeType == "amneziawg" {
+		return writeAmneziaWGConfig(dataJSON, wgKey, envelope.Result.Addrs, home, out, endpoint, fullTunnel)
 	}
 
 	if nodeType != "wireguard" {
@@ -313,10 +329,14 @@ func truncate(b []byte, n int) string {
 // do, and returns the secret the client keeps: the WireGuard public key is
 // derived from wgKey, the proxy types get a fresh random UUID (sent as a
 // 16-byte array, or as the canonical string for hysteria2).
-func peerRequest(nodeType string, wgKey *wgtypes.Key) ([]byte, string, error) {
+func peerRequest(nodeType string, wgKey *wgtypes.Key, awgVersion int) ([]byte, string, error) {
 	switch nodeType {
 	case "wireguard", "amneziawg":
-		peerJSON, _ := json.Marshal(map[string]string{"public_key": wgKey.Public().String()})
+		req := map[string]interface{}{"public_key": wgKey.Public().String()}
+		if nodeType == "amneziawg" && awgVersion != 0 {
+			req["awg_version"] = awgVersion
+		}
+		peerJSON, _ := json.Marshal(req)
 		return peerJSON, wgKey.Public().String(), nil
 	case "v2ray", "xray", "openvpn", "hysteria2":
 		var id [16]byte
@@ -352,4 +372,61 @@ func mustJSON(v interface{}) string {
 		panic(err)
 	}
 	return string(b)
+}
+
+// writeAmneziaWGConfig writes an awg-quick client configuration from an
+// AmneziaWG handshake: the WireGuard part plus the parameters the client must
+// match (S1-S4, H1-H4, any I1-I5 signature packets, and for the 3.1 tier the
+// MTU, header protection key and random trailers). Junk packet counts are the
+// client's own choice; fixed values in the usual range are written.
+func writeAmneziaWGConfig(dataJSON []byte, wgKey *wgtypes.Key, hosts []string, home, out, endpoint string, fullTunnel bool) error {
+	var data struct {
+		Addrs    []string                 `json:"addrs"`
+		Metadata []map[string]interface{} `json:"metadata"`
+	}
+	// Numbers stay as written: H1-H4 run up to 2^32 and must not turn into floats.
+	dec := json.NewDecoder(bytes.NewReader(dataJSON))
+	dec.UseNumber()
+	if err := dec.Decode(&data); err != nil {
+		return err
+	}
+	if len(data.Metadata) == 0 || len(data.Addrs) == 0 {
+		return fmt.Errorf("handshake data incomplete: %s", dataJSON)
+	}
+	m := data.Metadata[0]
+	fmt.Printf("handshake data: addrs=%v port=%v awg_version=%v endpoint_hosts=%v\n", data.Addrs, m["port"], m["awg_version"], hosts)
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "[Interface]\nPrivateKey = %s\nAddress = %s\nJc = 4\nJmin = 40\nJmax = 70\n", wgKey.String(), strings.Join(data.Addrs, ","))
+	for _, k := range []string{"s1", "s2", "s3", "s4", "h1", "h2", "h3", "h4"} {
+		fmt.Fprintf(&b, "%s = %v\n", strings.ToUpper(k), m[k])
+	}
+	for _, k := range []string{"i1", "i2", "i3", "i4", "i5"} {
+		if v, ok := m[k].(string); ok && v != "" {
+			fmt.Fprintf(&b, "%s = %s\n", strings.ToUpper(k), v)
+		}
+	}
+	if v, ok := m["awg_version"].(json.Number); ok && v.String() == "3" {
+		trailers := "off"
+		if t, _ := m["random_trailers"].(bool); t {
+			trailers = "on"
+		}
+		fmt.Fprintf(&b, "MTU = %v\nHeaderProtectionKey = %v\nRandomTrailers = %s\nContentPaddingAddition = 0-32\n", m["mtu"], m["header_protection_key"], trailers)
+	}
+	allowedIPs := "10.8.0.1/32"
+	if fullTunnel {
+		allowedIPs = "0.0.0.0/0, ::/0"
+	}
+	fmt.Fprintf(&b, "\n[Peer]\nPublicKey = %v\nEndpoint = %s:%v\nAllowedIPs = %s\nPersistentKeepalive = 15\n", m["public_key"], endpoint, m["port"], allowedIPs)
+
+	if out == "" {
+		out = filepath.Join(home, "e2e-client.conf")
+	}
+	if err := os.WriteFile(out, []byte(b.String()), 0o600); err != nil {
+		return err
+	}
+	fmt.Printf("wrote %s (endpoint %s:%v, allowed ips %s)\n", out, endpoint, m["port"], allowedIPs)
+	fmt.Printf("next (as root): awg-quick up %s && sleep 20 && awg show && awg-quick down %s\n", out, out)
+
+	return nil
 }
