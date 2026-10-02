@@ -385,3 +385,99 @@ func TestLogLevelFollowsNodeLogLevel(t *testing.T) {
 		}
 	}
 }
+
+// routingRules is the rendered config's routing rules, keyed by what they
+// match; it fails the test unless every rule but the API's ends in the
+// blackhole outbound.
+func routingRules(t *testing.T, dir string) (map[string]interface{}, map[string]map[string]interface{}) {
+	t.Helper()
+
+	raw, err := os.ReadFile(filepath.Join(dir, "xray_config.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc map[string]interface{}
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		t.Fatalf("rendered config is not JSON: %v\n%s", err, raw)
+	}
+
+	blackhole := false
+	for _, o := range doc["outbounds"].([]interface{}) {
+		o := o.(map[string]interface{})
+		if o["tag"] == "blocked" && o["protocol"] == "blackhole" {
+			blackhole = true
+		}
+	}
+	if !blackhole {
+		t.Fatalf("no blackhole outbound tagged blocked: %v", doc["outbounds"])
+	}
+	if first := doc["outbounds"].([]interface{})[0].(map[string]interface{}); first["protocol"] != "freedom" {
+		t.Fatalf("the default (first) outbound must be freedom: %v", first)
+	}
+
+	routing := doc["routing"].(map[string]interface{})
+	rules := map[string]map[string]interface{}{}
+	for _, r := range routing["rules"].([]interface{}) {
+		r := r.(map[string]interface{})
+		switch {
+		case r["inboundTag"] != nil:
+			rules["api"] = r
+			continue
+		case r["domain"] != nil:
+			rules["domain"] = r
+		case r["ip"] != nil:
+			rules["ip"] = r
+		case r["port"] != nil:
+			rules["port"] = r
+		default:
+			t.Fatalf("unexpected rule %v", r)
+		}
+		if r["outboundTag"] != "blocked" {
+			t.Fatalf("rule %v does not block", r)
+		}
+	}
+
+	return routing, rules
+}
+
+// TestInitRendersEgressPolicy: a client cannot reach the blocked networks,
+// loopback by name (the control API first of all), or port 25 unless the
+// operator allows it.
+func TestInitRendersEgressPolicy(t *testing.T) {
+	stubBinary(t)
+	t.Cleanup(func() { common.SetEgress(common.Egress{}) })
+
+	dir, _ := home(t, xraytypes.SecurityReality)
+	if err := NewXRay().Init(dir); err != nil {
+		t.Fatal(err)
+	}
+	routing, rules := routingRules(t, dir)
+
+	if routing["domainStrategy"] != "IPIfNonMatch" {
+		t.Fatalf("domainStrategy %v: a name that resolves to loopback would pass", routing["domainStrategy"])
+	}
+	var ips []string
+	for _, ip := range rules["ip"]["ip"].([]interface{}) {
+		ips = append(ips, ip.(string))
+	}
+	if strings.Join(ips, " ") != strings.Join(common.BlockedNetworks(), " ") {
+		t.Fatalf("blocked networks: %v", ips)
+	}
+	if d := rules["domain"]["domain"].([]interface{}); len(d) != 1 || d[0] != "domain:localhost" {
+		t.Fatalf("domain rule: %v", d)
+	}
+	if p := rules["port"]; p == nil || p["port"] != "25" || p["network"] != "tcp" {
+		t.Fatalf("port 25 rule: %v", p)
+	}
+	if api := rules["api"]; api["outboundTag"] != "api" {
+		t.Fatalf("api rule: %v", api)
+	}
+
+	common.SetEgress(common.Egress{AllowSMTP: true})
+	if err := NewXRay().Init(dir); err != nil {
+		t.Fatal(err)
+	}
+	if _, rules = routingRules(t, dir); rules["port"] != nil || rules["ip"] == nil {
+		t.Fatalf("allow_smtp: rules %v", rules)
+	}
+}

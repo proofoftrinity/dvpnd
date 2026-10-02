@@ -112,6 +112,11 @@ func (s *XRay) Init(home string) (err error) {
 		TLSCertPath: filepath.Join(home, "tls.crt"),
 		TLSKeyPath:  filepath.Join(home, "tls.key"),
 		LogLevel:    logLevel(),
+
+		BlockedNetworks: common.BlockedNetworks(),
+		BlockedDomain:   common.BlockedLocalDomain,
+		SMTPPort:        common.SMTPPort,
+		AllowSMTP:       common.EgressPolicy().AllowSMTP,
 	}
 
 	security := types.TransportSecurityReality
@@ -126,7 +131,7 @@ func (s *XRay) Init(home string) (err error) {
 		}
 	}
 
-	t, err := template.New("xray_json").Parse(configTemplate)
+	t, err := template.New("xray_json").Funcs(template.FuncMap{"json": common.JSON}).Parse(configTemplate)
 	if err != nil {
 		return err
 	}

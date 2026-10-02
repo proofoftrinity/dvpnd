@@ -12,9 +12,11 @@ import (
 // One VLESS inbound over raw TCP, wrapped in TLS with the node's certificate
 // or in REALITY; peers are added and removed over the gRPC API on the
 // loopback inbound, and per-user traffic statistics are switched on.
-// Private and loopback destinations are blocked explicitly (not with
-// geoip:private, which needs the geoip asset file) so a client cannot reach
-// the host's own services, the control API first of all.
+// The node's egress policy is routed to a blackhole: the blocked networks
+// (listed explicitly, not with geoip:private, which needs the geoip asset
+// file), localhost by name, and TCP port 25 unless allowed. IPIfNonMatch
+// resolves a destination given as a name and matches its addresses too, so a
+// name that points at loopback cannot reach the control API.
 var configTemplate = strings.TrimSpace(`
 {
     "log": {
@@ -96,6 +98,7 @@ var configTemplate = strings.TrimSpace(`
         }
     ],
     "routing": {
+        "domainStrategy": "IPIfNonMatch",
         "rules": [
             {
                 "type": "field",
@@ -106,18 +109,22 @@ var configTemplate = strings.TrimSpace(`
             },
             {
                 "type": "field",
-                "ip": [
-                    "0.0.0.0/8",
-                    "10.0.0.0/8",
-                    "100.64.0.0/10",
-                    "127.0.0.0/8",
-                    "169.254.0.0/16",
-                    "172.16.0.0/12",
-                    "192.168.0.0/16",
-                    "::1/128",
-                    "fc00::/7",
-                    "fe80::/10"
+                "domain": [
+                    "domain:{{ .BlockedDomain }}"
                 ],
+                "outboundTag": "blocked"
+            },
+{{- if not .AllowSMTP }}
+            {
+                "type": "field",
+                "network": "tcp",
+                "port": "{{ .SMTPPort }}",
+                "outboundTag": "blocked"
+            },
+{{- end }}
+            {
+                "type": "field",
+                "ip": {{ json .BlockedNetworks }},
                 "outboundTag": "blocked"
             }
         ]
@@ -135,6 +142,12 @@ type templateData struct {
 	TLSCertPath string
 	TLSKeyPath  string
 	LogLevel    string
+
+	// The egress policy: see common.Egress.
+	BlockedNetworks []string
+	BlockedDomain   string
+	SMTPPort        int
+	AllowSMTP       bool
 }
 
 // logLevel is xray's error-log level. Its warnings carry client addresses and
