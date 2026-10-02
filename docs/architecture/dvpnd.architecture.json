@@ -47,7 +47,7 @@
     ],
     "repository": {
       "url": "git@github.com:trinitystake/dvpnd.git",
-      "revision": "4e87a3dc185035d953b3ce0ec09eb43bf02aa1cb",
+      "revision": "2b1f0909adc4f771a6307d13c9e44036314b948b",
       "link_mode": "local-only"
     }
   },
@@ -120,8 +120,7 @@
           "path": "api/session/handshake.go"
         },
         {
-          "path": "api/session/guard.go",
-          "label": "HTTPS only, attempt limit"
+          "path": "api/session/reply.go"
         }
       ]
     },
@@ -164,13 +163,13 @@
         160,
         64
       ],
-      "tag": "root or NET_ADMIN",
+      "tag": "dvpnd-proxy",
       "sources": [
         {
           "path": "services/wireguard/wireguard.go"
         },
         {
-          "path": "services/common/process.go"
+          "path": "services/common/runtime.go"
         },
         {
           "path": "services/common/nat.go"
@@ -274,6 +273,9 @@
         },
         {
           "path": "lite/tx.go"
+        },
+        {
+          "path": "lite/authz.go"
         }
       ]
     },
@@ -441,6 +443,7 @@
       "title": "Handshake",
       "items": [
         "POST / is signed with the session account key; no prior tx needed",
+        "The reply is signed by the node key in X-Dvpnd-Signature",
         "HTTPS only, at most 30 attempts a minute per address",
         "The chain, not the node, says whether a session is active and paid"
       ]
@@ -450,6 +453,7 @@
       "title": "Chain",
       "items": [
         "lite/ is the only chain client: queries and signed txs over RPC",
+        "With [keyring] granter a hot key signs through authz; the node account stays off the server",
         "Update intervals never exceed 80% of the chain status_timeout"
       ]
     },
@@ -458,9 +462,8 @@
       "title": "Trust boundary",
       "items": [
         "Clients pin the self-signed certificate; no CA involved",
-        "Peers the database does not know are evicted every set_sessions tick",
         "Clients reach the internet only: not the host, private or link-local networks, or port 25",
-        "Runs as root in a systemd sandbox, or with the four capabilities the Dockerfile keeps",
+        "Protocol daemons run as dvpnd-proxy; the node as root with bounded capabilities",
         "No client IPs or peer keys in the log unless run at debug"
       ]
     }
