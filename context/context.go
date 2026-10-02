@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"sync"
 	"time"
 
 	cmtlog "github.com/cometbft/cometbft/libs/log"
@@ -21,6 +22,12 @@ import (
 )
 
 type Context struct {
+	// admission serialises every change to the peer set together with the
+	// session table: a handshake's checks, AddPeer and its row, and the jobs'
+	// removals. Without it concurrent handshakes all pass the max_peers and
+	// duplicate checks, and a job can evict a peer whose row is not written yet.
+	admission sync.Mutex
+
 	bandwidth       *v1base.Bandwidth
 	bandwidthSource string
 	client          *lite.Client
@@ -45,6 +52,9 @@ func (c *Context) WithHandler(v http.Handler) *Context               { c.handler
 func (c *Context) WithLocation(v *geoiptypes.GeoIPLocation) *Context { c.location = v; return c }
 func (c *Context) WithLogger(v cmtlog.Logger) *Context               { c.logger = v; return c }
 func (c *Context) WithService(v types.Service) *Context              { c.service = v; return c }
+
+// Admission is the lock described on the admission field.
+func (c *Context) Admission() *sync.Mutex { return &c.admission }
 
 func (c *Context) Address() base.NodeAddress           { return c.Operator().Bytes() }
 func (c *Context) Bandwidth() *v1base.Bandwidth        { return c.bandwidth }

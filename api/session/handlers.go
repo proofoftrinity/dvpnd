@@ -47,7 +47,7 @@ func HandlerAddSession(ctx *context.Context) gin.HandlerFunc {
 			return
 		}
 
-		res, apiErr := admit(ctx, admitRequest{
+		res, apiErr := admit(ctx, ctx.Client(), admitRequest{
 			AccAddress: req.AccAddress,
 			ID:         req.URI.ID,
 			PeerData:   req.Key,

@@ -132,7 +132,7 @@ func HandlerHandshake(ctx *context.Context) gin.HandlerFunc {
 			return
 		}
 
-		res, apiErr := admit(ctx, admitRequest{AccAddress: accAddr, ID: body.ID, PeerData: peerData})
+		res, apiErr := admit(ctx, ctx.Client(), admitRequest{AccAddress: accAddr, ID: body.ID, PeerData: peerData})
 		if apiErr != nil {
 			replyError(ctx, c, apiErr.Status, apiErr.Code, apiErr.Err)
 			return
