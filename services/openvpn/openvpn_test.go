@@ -49,7 +49,7 @@ func home(t *testing.T, proto string, ipv6 bool) (string, *ovpntypes.Config) {
 
 func TestInitRendersServerConfig(t *testing.T) {
 	stubBinary(t)
-	dir, cfg := home(t, ovpntypes.ProtoUDP, true)
+	dir, _ := home(t, ovpntypes.ProtoUDP, true)
 
 	s := NewOpenVPN()
 	if err := s.Init(dir); err != nil {
@@ -68,7 +68,8 @@ func TestInitRendersServerConfig(t *testing.T) {
 		"tls-crypt " + filepath.Join(dir, "openvpn", "tc.key") + "\n",
 		"dh none\n", "tls-cipher TLS-ECDHE-ECDSA-WITH-AES-256-GCM-SHA384\n",
 		"data-ciphers AES-256-GCM:AES-128-GCM\n", "remote-cert-tls client\n",
-		"management 127.0.0.1 " + itoa(int64(cfg.Management.Port)) + "\n", "management-client-auth\n", "auth-user-pass-optional\n",
+		"management " + filepath.Join(dir, "openvpn.sock") + " unix\n", "management-client-user root\n",
+		"management-client-auth\n", "auth-user-pass-optional\n",
 		"explicit-exit-notify 1\n",
 	} {
 		if !strings.Contains(out, want) {
@@ -186,7 +187,7 @@ func TestPeersAndHandshake(t *testing.T) {
 	// Usage: a live connection plus what ended connections used.
 	f := startFakeServer(t)
 	f.clients = []clientStatus{{commonName: cn, received: 10, sent: 200, cid: "3"}}
-	conn, err := dialManagement(f.port(), 2*1e9)
+	conn, err := dialManagement(f.socket(), 2*1e9)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -226,7 +227,7 @@ func TestPeersAndHandshake(t *testing.T) {
 
 func TestStartStop(t *testing.T) {
 	stubBinary(t)
-	dir, cfg := home(t, ovpntypes.ProtoUDP, false)
+	dir, _ := home(t, ovpntypes.ProtoUDP, false)
 
 	var rules []string
 	saved, savedQuiet := common.RunCommand, common.RunQuiet
@@ -250,7 +251,7 @@ func TestStartStop(t *testing.T) {
 	}
 
 	// The fake management server must listen where the config says.
-	f := startFakeServerOn(t, cfg.Management.Port)
+	f := startFakeServerOn(t, s.socketPath)
 	_ = f
 
 	if err := s.Start(); err != nil {

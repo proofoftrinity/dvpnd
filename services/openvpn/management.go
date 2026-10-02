@@ -43,17 +43,17 @@ type pendingCommand struct {
 	done  chan struct{}
 }
 
-// dialManagement connects to the management port, retrying until the server
+// dialManagement connects to the management socket, retrying until the server
 // has opened it or the deadline passes.
-func dialManagement(port uint16, timeout time.Duration) (net.Conn, error) {
+func dialManagement(socket string, timeout time.Duration) (net.Conn, error) {
 	deadline := time.Now().Add(timeout)
 	for {
-		conn, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", port), time.Second)
+		conn, err := net.DialTimeout("unix", socket, time.Second)
 		if err == nil {
 			return conn, nil
 		}
 		if time.Now().After(deadline) {
-			return nil, fmt.Errorf("management interface on port %d: %w", port, err)
+			return nil, fmt.Errorf("management interface at %s: %w", socket, err)
 		}
 		time.Sleep(200 * time.Millisecond)
 	}

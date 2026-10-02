@@ -30,31 +30,23 @@ uplink = {{ toml .Uplink }}
 # Hand each peer an IPv6 tunnel address next to the IPv4 one; the host must
 # then reach the IPv6 internet. Set it false for an IPv4-only tunnel
 enable_ipv6 = {{ .EnableIPv6 }}
-
-[management]
-# Loopback port of OpenVPN's management interface, over which the node admits
-# clients and reads their traffic; nothing else may bind it
-port = {{ .Management.Port }}
 	`)
 
 	t = utils.ConfigTemplate("openvpn_toml", ct)
 )
 
-type ManagementConfig struct {
-	Port uint16 `json:"port" mapstructure:"port"`
-}
-
+// Config is openvpn.toml. A file written before the management interface
+// moved to a unix socket still has a [management] port; it is ignored.
 type Config struct {
-	Interface  string            `json:"interface" mapstructure:"interface"`
-	ListenPort uint16            `json:"listen_port" mapstructure:"listen_port"`
-	Proto      string            `json:"proto" mapstructure:"proto"`
-	Uplink     string            `json:"uplink" mapstructure:"uplink"`
-	EnableIPv6 bool              `json:"enable_ipv6" mapstructure:"enable_ipv6"`
-	Management *ManagementConfig `json:"management" mapstructure:"management"`
+	Interface  string `json:"interface" mapstructure:"interface"`
+	ListenPort uint16 `json:"listen_port" mapstructure:"listen_port"`
+	Proto      string `json:"proto" mapstructure:"proto"`
+	Uplink     string `json:"uplink" mapstructure:"uplink"`
+	EnableIPv6 bool   `json:"enable_ipv6" mapstructure:"enable_ipv6"`
 }
 
 func NewConfig() *Config {
-	return &Config{Management: &ManagementConfig{}}
+	return &Config{}
 }
 
 func (c *Config) Validate() error {
@@ -70,12 +62,6 @@ func (c *Config) Validate() error {
 	if strings.ContainsAny(c.Uplink, " \n") {
 		return errors.New("invalid uplink")
 	}
-	if c.Management.Port == 0 {
-		return errors.New("management port cannot be zero")
-	}
-	if c.Management.Port == c.ListenPort {
-		return errors.New("management port must differ from listen_port")
-	}
 
 	return nil
 }
@@ -85,10 +71,6 @@ func (c *Config) WithDefaultValues() *Config {
 	c.ListenPort = utils.RandomPort()
 	c.Proto = ProtoUDP
 	c.EnableIPv6 = true
-	c.Management.Port = utils.RandomPort()
-	for c.Management.Port == c.ListenPort {
-		c.Management.Port = utils.RandomPort()
-	}
 
 	return c
 }

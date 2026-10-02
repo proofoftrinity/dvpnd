@@ -41,27 +41,38 @@ persist-tun
 {{- if eq .Proto "udp" }}
 explicit-exit-notify 1
 {{- end }}
-management 127.0.0.1 {{ .ManagementPort }}
+management {{ .ManagementSocket }} unix
+management-client-user root
 management-client-auth
 auth-user-pass-optional
 verb {{ .Verb }}
+{{- if .User }}
+user {{ .User }}
+group {{ .Group }}
+{{- end }}
 `) + "\n"
 
 // templateData is what the server configuration renders from.
 type templateData struct {
-	Interface      string
-	Proto          string
-	ListenPort     uint16
-	EnableIPv6     bool
-	IPv4Network    string
-	IPv4Netmask    string
-	IPv6Network    string
-	CACert         string
-	ServerCert     string
-	ServerKey      string
-	TLSCrypt       string
-	ManagementPort uint16
-	Verb           int
+	Interface   string
+	Proto       string
+	ListenPort  uint16
+	EnableIPv6  bool
+	IPv4Network string
+	IPv4Netmask string
+	IPv6Network string
+	CACert      string
+	ServerCert  string
+	ServerKey   string
+	TLSCrypt    string
+	// ManagementSocket is the unix socket of the management interface, in
+	// the runtime directory; only root may connect to it.
+	ManagementSocket string
+	Verb             int
+	// User and Group, when set, are the account the server drops to once
+	// its tunnel is up.
+	User  string
+	Group string
 }
 
 // verb is the OpenVPN log level: 3 (its usual level, which logs every client's

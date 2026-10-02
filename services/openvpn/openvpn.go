@@ -54,7 +54,7 @@ var (
 	// stopTimeout is how long Stop waits after SIGTERM before killing.
 	stopTimeout = 10 * time.Second
 
-	// managementTimeout is how long Start waits for the management port.
+	// managementTimeout is how long Start waits for the management socket.
 	managementTimeout = 15 * time.Second
 
 	// ensureForwarding turns IP forwarding on; a variable so tests can skip it.
@@ -77,6 +77,7 @@ type OpenVPN struct {
 	nat        common.NAT
 	egress     common.TunnelEgress
 	configPath string
+	socketPath string
 
 	mu     sync.Mutex
 	byCN   map[string]string   // certificate common name → session key
@@ -129,19 +130,30 @@ func (s *OpenVPN) Init(home string) (err error) {
 	}
 
 	data := templateData{
-		Interface:      s.config.Interface,
-		Proto:          s.config.Proto,
-		ListenPort:     s.config.ListenPort,
-		EnableIPv6:     s.config.EnableIPv6,
-		IPv4Network:    ipv4Network,
-		IPv4Netmask:    ipv4Netmask,
-		IPv6Network:    ipv6Network,
-		CACert:         s.pki.caCertPath(),
-		ServerCert:     s.pki.serverCertPath(),
-		ServerKey:      s.pki.serverKeyPath(),
-		TLSCrypt:       s.pki.tlsCryptPath(),
-		ManagementPort: s.config.Management.Port,
-		Verb:           verb(),
+		Interface:   s.config.Interface,
+		Proto:       s.config.Proto,
+		ListenPort:  s.config.ListenPort,
+		EnableIPv6:  s.config.EnableIPv6,
+		IPv4Network: ipv4Network,
+		IPv4Netmask: ipv4Netmask,
+		IPv6Network: ipv6Network,
+		CACert:      s.pki.caCertPath(),
+		ServerCert:  s.pki.serverCertPath(),
+		ServerKey:   s.pki.serverKeyPath(),
+		TLSCrypt:    s.pki.tlsCryptPath(),
+		Verb:        verb(),
+	}
+
+	// The server reads its keys and opens the tunnel as root, then drops to
+	// the proxy account when the node has one; the management socket goes to
+	// the runtime directory, where only root may connect to it.
+	rt := common.CurrentRuntime()
+	s.socketPath = filepath.Join(rt.Dir, "openvpn.sock")
+	data.ManagementSocket = s.socketPath
+	// A socket left by a server that died must not answer for this one.
+	_ = os.Remove(s.socketPath)
+	if rt.Proxy != nil {
+		data.User, data.Group = rt.Proxy.Name, rt.Proxy.Group
 	}
 
 	t, err := template.New("openvpn_conf").Parse(configTemplate)
@@ -153,8 +165,7 @@ func (s *OpenVPN) Init(home string) (err error) {
 	if err = t.Execute(&buf, data); err != nil {
 		return err
 	}
-	s.configPath = filepath.Join(os.TempDir(), "openvpn_server.conf")
-	if err = os.WriteFile(s.configPath, buf.Bytes(), 0600); err != nil {
+	if s.configPath, err = rt.WriteFile("openvpn_server.conf", buf.Bytes()); err != nil {
 		return err
 	}
 
@@ -195,14 +206,14 @@ func (s *OpenVPN) Start() (err error) {
 		return err
 	}
 
-	s.process, err = common.StartProcess(binaryName, []string{"--config", s.configPath}, nil)
+	s.process, err = common.StartProcess(binaryName, []string{"--config", s.configPath}, nil, nil)
 	if err != nil {
 		s.egress.Down()
 
 		return err
 	}
 
-	conn, err := dialManagement(s.config.Management.Port, managementTimeout)
+	conn, err := dialManagement(s.socketPath, managementTimeout)
 	if err != nil {
 		_ = s.process.Stop(stopTimeout)
 		s.egress.Down()

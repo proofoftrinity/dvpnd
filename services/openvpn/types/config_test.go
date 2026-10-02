@@ -3,6 +3,7 @@
 package types
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -37,8 +38,6 @@ func TestConfig(t *testing.T) {
 	}{
 		{"proto", func(c *Config) { c.Proto = "sctp" }, "proto must be"},
 		{"port", func(c *Config) { c.ListenPort = 0 }, "listen_port"},
-		{"management", func(c *Config) { c.Management.Port = 0 }, "management port"},
-		{"same ports", func(c *Config) { c.Management.Port = c.ListenPort }, "must differ"},
 		{"interface", func(c *Config) { c.Interface = "a b" }, "interface"},
 	}
 	for _, tc := range cases {
@@ -48,5 +47,25 @@ func TestConfig(t *testing.T) {
 		if err == nil || !strings.Contains(err.Error(), tc.want) {
 			t.Errorf("%s: got %v, want %q", tc.name, err, tc.want)
 		}
+	}
+}
+
+// TestConfigWithManagementPort: a file written when the management interface
+// was a loopback port still reads; the port is ignored.
+func TestConfigWithManagementPort(t *testing.T) {
+	path := filepath.Join(t.TempDir(), ConfigFileName)
+	c := NewConfig().WithDefaultValues()
+	old := c.String() + "\n[management]\nport = 41000\n"
+	if err := os.WriteFile(path, []byte(old), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	v := viper.New()
+	v.SetConfigFile(path)
+	read, err := ReadInConfig(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := read.Validate(); err != nil || read.ListenPort != c.ListenPort {
+		t.Fatalf("read %+v: %v", read, err)
 	}
 }

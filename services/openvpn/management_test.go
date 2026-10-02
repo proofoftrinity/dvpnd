@@ -6,6 +6,7 @@ import (
 	"bufio"
 	"encoding/base64"
 	"net"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -29,13 +30,13 @@ type fakeServer struct {
 }
 
 func startFakeServer(t *testing.T) *fakeServer {
-	return startFakeServerOn(t, 0)
+	return startFakeServerOn(t, filepath.Join(t.TempDir(), "openvpn.sock"))
 }
 
-func startFakeServerOn(t *testing.T, port uint16) *fakeServer {
+func startFakeServerOn(t *testing.T, socket string) *fakeServer {
 	t.Helper()
 
-	lis, err := net.Listen("tcp", "127.0.0.1:"+strconv.Itoa(int(port)))
+	lis, err := net.Listen("unix", socket)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,8 +47,8 @@ func startFakeServerOn(t *testing.T, port uint16) *fakeServer {
 	return f
 }
 
-func (f *fakeServer) port() uint16 {
-	return uint16(f.lis.Addr().(*net.TCPAddr).Port)
+func (f *fakeServer) socket() string {
+	return f.lis.Addr().String()
 }
 
 func (f *fakeServer) serve() {
@@ -146,7 +147,7 @@ func TestManagementAdmitStatusKill(t *testing.T) {
 	f := startFakeServer(t)
 	f.clients = []clientStatus{{commonName: "peer-a", received: 100, sent: 2000, cid: "7"}}
 
-	conn, err := dialManagement(f.port(), 2*time.Second)
+	conn, err := dialManagement(f.socket(), 2*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
