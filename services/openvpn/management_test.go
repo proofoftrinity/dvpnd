@@ -151,10 +151,23 @@ func TestManagementAdmitStatusKill(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var disconnected []string
+	// The disconnect callback runs on the management reader's goroutine.
+	var (
+		mu           sync.Mutex
+		disconnected []string
+	)
+	gone := func() []string {
+		mu.Lock()
+		defer mu.Unlock()
+		return append([]string(nil), disconnected...)
+	}
 	m := newManagement(conn,
 		func(cn string) bool { return cn == "peer-a" },
-		func(cn string, rx, tx int64) { disconnected = append(disconnected, cn+":"+itoa(rx)+"/"+itoa(tx)) })
+		func(cn string, rx, tx int64) {
+			mu.Lock()
+			defer mu.Unlock()
+			disconnected = append(disconnected, cn+":"+itoa(rx)+"/"+itoa(tx))
+		})
 	t.Cleanup(func() { m.Close() })
 
 	rows, err := m.status()
@@ -178,9 +191,9 @@ func TestManagementAdmitStatusKill(t *testing.T) {
 	})
 
 	f.event("DISCONNECT", "7", "", map[string]string{"common_name": "peer-a", "bytes_received": "150", "bytes_sent": "2500"})
-	waitFor(t, "disconnect", func() bool { return len(disconnected) == 1 })
-	if disconnected[0] != "peer-a:150/2500" {
-		t.Fatalf("disconnect: %v", disconnected)
+	waitFor(t, "disconnect", func() bool { return len(gone()) == 1 })
+	if got := gone(); got[0] != "peer-a:150/2500" {
+		t.Fatalf("disconnect: %v", got)
 	}
 
 	if err := m.kill("peer-a"); err != nil {
