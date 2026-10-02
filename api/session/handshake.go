@@ -116,31 +116,31 @@ func HandlerHandshake(ctx *context.Context) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var body HandshakeBody
 		if err := c.ShouldBindJSON(&body); err != nil {
-			c.JSON(http.StatusBadRequest, types.NewResponseError(2, err))
+			replyError(ctx, c, http.StatusBadRequest, 2, err)
 			return
 		}
 
 		accAddr, data, err := verifyHandshake(&body)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, types.NewResponseError(4, err))
+			replyError(ctx, c, http.StatusBadRequest, 4, err)
 			return
 		}
 
 		peerData, err := ctx.Service().ParsePeerRequest(data)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, types.NewResponseError(2, err))
+			replyError(ctx, c, http.StatusBadRequest, 2, err)
 			return
 		}
 
 		res, apiErr := admit(ctx, admitRequest{AccAddress: accAddr, ID: body.ID, PeerData: peerData})
 		if apiErr != nil {
-			c.JSON(apiErr.Status, types.NewResponseError(apiErr.Code, apiErr.Err))
+			replyError(ctx, c, apiErr.Status, apiErr.Code, apiErr.Err)
 			return
 		}
 
 		result, err := buildHandshakeResult(ctx, res.Peer)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, types.NewResponseError(10, err))
+			replyError(ctx, c, http.StatusInternalServerError, 10, err)
 			return
 		}
 

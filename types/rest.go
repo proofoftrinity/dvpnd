@@ -43,3 +43,12 @@ func NewResponseError(code int, v interface{}) *Response {
 func NewResponseResult(v interface{}) *Response {
 	return NewResponse(nil, v)
 }
+
+// InternalErrorMessage is what a client is told when the node itself failed
+// (a 5xx). The detail (an RPC endpoint's error, the proxy's API) goes to the
+// node's log: it is the operator's business, not the client's.
+const InternalErrorMessage = "the node could not complete the request; try again later"
+
+// CodeInternal is the error code of a request that failed inside the node
+// for no reason the client gave.
+const CodeInternal = 13

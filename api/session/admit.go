@@ -4,12 +4,14 @@ package session
 
 import (
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"math"
 	"net/http"
 
 	sdkmath "cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/gin-gonic/gin"
 	v1base "github.com/sentinel-official/sentinelhub/v12/types/v1"
 	sessiontypes "github.com/sentinel-official/sentinelhub/v12/x/session/types/v3"
 	subscriptiontypes "github.com/sentinel-official/sentinelhub/v12/x/subscription/types/v3"
@@ -31,6 +33,17 @@ func (e *apiError) Error() string { return e.Err.Error() }
 
 func newAPIError(status, code int, err error) *apiError {
 	return &apiError{Status: status, Code: code, Err: err}
+}
+
+// replyError answers a handshake with an error. When the node itself failed
+// (a 5xx) the detail is logged and the client gets a generic message: an RPC
+// endpoint's error or the proxy's is the operator's business.
+func replyError(ctx *context.Context, c *gin.Context, status, code int, err error) {
+	if status >= http.StatusInternalServerError {
+		ctx.Log().Error("Handshake failed inside the node", "path", c.Request.URL.Path, "code", code, "error", err)
+		err = errors.New(types.InternalErrorMessage)
+	}
+	c.JSON(status, types.NewResponseError(code, err))
 }
 
 // admitRequest is a session admission that has already been authenticated:

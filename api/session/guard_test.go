@@ -5,6 +5,7 @@ package session
 import (
 	"bytes"
 	"crypto/tls"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -15,6 +16,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/trinitystake/dvpnd/v9/context"
+	"github.com/trinitystake/dvpnd/v9/types"
 )
 
 func TestRequireTLS(t *testing.T) {
@@ -118,5 +120,43 @@ func TestLimitHandshakes(t *testing.T) {
 	}
 	if strings.Contains(buf.String(), "203.0.113.9") {
 		t.Fatalf("the limiter must not log client addresses:\n%s", buf.String())
+	}
+}
+
+// TestReplyErrorHidesNodeFailures: a client is told why its request was
+// refused, but not the internals of a failure inside the node, which the
+// operator finds in the log instead.
+func TestReplyErrorHidesNodeFailures(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	var buf bytes.Buffer
+	ctx := context.NewContext().WithLogger(cmtlog.NewTMLogger(&buf))
+
+	for _, tc := range []struct {
+		status int
+		err    string
+		reply  string
+	}{
+		{http.StatusBadRequest, "signature does not verify", "signature does not verify"},
+		{http.StatusInternalServerError, "https://rpc.example:443: connection refused", types.InternalErrorMessage},
+	} {
+		buf.Reset()
+		rec := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(rec)
+		c.Request = httptest.NewRequest(http.MethodPost, "/", nil)
+
+		replyError(ctx, c, tc.status, 5, errors.New(tc.err))
+
+		if rec.Code != tc.status || !strings.Contains(rec.Body.String(), tc.reply) {
+			t.Errorf("%d: reply %s", tc.status, rec.Body.String())
+		}
+		if tc.status >= 500 {
+			if strings.Contains(rec.Body.String(), "rpc.example") {
+				t.Errorf("internal detail reached the client: %s", rec.Body.String())
+			}
+			if !strings.Contains(buf.String(), "rpc.example") {
+				t.Errorf("internal detail not logged: %s", buf.String())
+			}
+		}
 	}
 }
