@@ -82,6 +82,13 @@ rpc_tx_timeout = {{ .Chain.RPCTxTimeout }}
 # Calculate the transaction fee by simulating it
 simulate_and_execute = {{ .Chain.SimulateAndExecute }}
 
+[egress]
+# Clients never reach the node host itself, private, shared or link-local networks (the
+# provider's metadata service among them), or each other. Outgoing mail (TCP port 25) is
+# blocked too, because a node that relays anyone's mail ends up on block lists and its
+# provider may suspend it. Set to true only if you accept that.
+allow_smtp = {{ .Egress.AllowSMTP }}
+
 [geoip]
 # Service that discovers the node's public IP and location. All of them are free of
 # charge; the free tiers of auto, ipwhois, ip2location and cloudflare allow commercial use.
@@ -281,6 +288,27 @@ func (c *ChainConfig) WithDefaultValues() *ChainConfig {
 	c.RPCQueryTimeout = 10
 	c.RPCTxTimeout = 30
 	c.SimulateAndExecute = true
+
+	return c
+}
+
+// EgressConfig is what the operator may relax in the egress policy every
+// service applies (services/common/egress.go); the blocked networks are not
+// configurable.
+type EgressConfig struct {
+	AllowSMTP bool `json:"allow_smtp" mapstructure:"allow_smtp"`
+}
+
+func NewEgressConfig() *EgressConfig {
+	return &EgressConfig{}
+}
+
+func (c *EgressConfig) Validate() error {
+	return nil
+}
+
+func (c *EgressConfig) WithDefaultValues() *EgressConfig {
+	c.AllowSMTP = false
 
 	return c
 }
@@ -532,6 +560,7 @@ func (c *QOSConfig) WithDefaultValues() *QOSConfig {
 type Config struct {
 	Bandwidth *BandwidthConfig `json:"bandwidth" mapstructure:"bandwidth"`
 	Chain     *ChainConfig     `json:"chain" mapstructure:"chain"`
+	Egress    *EgressConfig    `json:"egress" mapstructure:"egress"`
 	GeoIP     *GeoIPConfig     `json:"geoip" mapstructure:"geoip"`
 	Handshake *HandshakeConfig `json:"handshake" mapstructure:"handshake"`
 	Keyring   *KeyringConfig   `json:"keyring" mapstructure:"keyring"`
@@ -543,6 +572,7 @@ func NewConfig() *Config {
 	return &Config{
 		Bandwidth: NewBandwidthConfig(),
 		Chain:     NewChainConfig(),
+		Egress:    NewEgressConfig(),
 		GeoIP:     NewGeoIPConfig(),
 		Handshake: NewHandshakeConfig(),
 		Keyring:   NewKeyringConfig(),
@@ -557,6 +587,9 @@ func (c *Config) Validate() error {
 	}
 	if err := c.Chain.Validate(); err != nil {
 		return errors.Wrapf(err, "invalid section chain")
+	}
+	if err := c.Egress.Validate(); err != nil {
+		return errors.Wrapf(err, "invalid section egress")
 	}
 	if err := c.GeoIP.Validate(); err != nil {
 		return errors.Wrapf(err, "invalid section geoip")
@@ -588,6 +621,7 @@ func (c *Config) Validate() error {
 func (c *Config) WithDefaultValues() *Config {
 	c.Bandwidth = c.Bandwidth.WithDefaultValues()
 	c.Chain = c.Chain.WithDefaultValues()
+	c.Egress = c.Egress.WithDefaultValues()
 	c.GeoIP = c.GeoIP.WithDefaultValues()
 	c.Handshake = c.Handshake.WithDefaultValues()
 	c.Keyring = c.Keyring.WithDefaultValues()

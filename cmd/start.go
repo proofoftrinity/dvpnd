@@ -67,6 +67,21 @@ func hnsdArgs(peers uint64, host net.IP) []string {
 	}
 }
 
+// apiPort is the TCP port of the node API's listen address; zero when it
+// names none.
+func apiPort(listenOn string) uint16 {
+	_, port, err := net.SplitHostPort(listenOn)
+	if err != nil {
+		return 0
+	}
+	v, err := strconv.ParseUint(port, 10, 16)
+	if err != nil {
+		return 0
+	}
+
+	return uint16(v)
+}
+
 // runHandshake keeps the Handshake resolver running for the life of the node.
 func runHandshake(log cmtlog.Logger, peers uint64, host net.IP) {
 	for {
@@ -228,9 +243,34 @@ func StartCmd() *cobra.Command {
 			bw := v1base.NewBandwidthFromInt64(measured.Upload, measured.Download)
 			log.Info("Bandwidth to advertise", "upload", bw.Upload, "download", bw.Download, "source", measured.Source)
 
+			// The proxies render the egress policy into their configuration
+			// in Init; the tunnel services install it as firewall rules in
+			// Start.
+			egress := common.Egress{AllowSMTP: config.Egress.AllowSMTP, APIPort: apiPort(config.Node.ListenOn)}
+			common.SetEgress(egress)
+			if egress.AllowSMTP {
+				log.Info("Clients may send mail: [egress] allow_smtp is on")
+			}
+
 			log.Info("Initializing the VPN service", "type", service.Type())
 			if err = service.Init(home); err != nil {
 				return err
+			}
+
+			// The resolver binds the tunnel address, which Init has settled;
+			// it starts once the tunnel is up, and the tunnel's firewall lets
+			// clients reach it. Without hnsd installed it stays off, and the
+			// root document says so, rather than clients being sent to a
+			// resolver that is not there.
+			if config.Handshake.Enable {
+				host, ok := service.(types.TunnelHost)
+				if _, err := exec.LookPath("hnsd"); err != nil || !ok {
+					log.Error("The Handshake resolver stays off: hnsd is not installed or the node type has no tunnel")
+					config.Handshake.Enable = false
+				} else {
+					egress.Resolver = host.TunnelIPv4()
+					common.SetEgress(egress)
+				}
 			}
 
 			log.Info("Starting the VPN service", "type", service.Type())
@@ -238,18 +278,8 @@ func StartCmd() *cobra.Command {
 				return err
 			}
 
-			// The resolver binds the tunnel address, so it starts once the
-			// tunnel is up. Without hnsd installed it stays off, and the root
-			// document says so, rather than clients being sent to a resolver
-			// that is not there.
-			if config.Handshake.Enable {
-				host, ok := service.(types.TunnelHost)
-				if _, err := exec.LookPath("hnsd"); err != nil || !ok {
-					log.Error("The Handshake resolver stays off: hnsd is not installed or the node type has no tunnel")
-					config.Handshake.Enable = false
-				} else {
-					go runHandshake(log, config.Handshake.Peers, host.TunnelIPv4())
-				}
+			if egress.Resolver != nil {
+				go runHandshake(log, config.Handshake.Peers, egress.Resolver)
 			}
 
 			log.Info("Opening the database", "path", databasePath)

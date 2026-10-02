@@ -158,3 +158,41 @@ func TestHandshakeResolverOffByDefault(t *testing.T) {
 		t.Fatal("the Handshake resolver needs hnsd, which is not installed with the node; it must be off by default")
 	}
 }
+
+// TestEgressSMTPBlockedByDefault: a config.toml without [egress], as every
+// node had before the section existed, keeps port 25 blocked; the operator's
+// opt-in survives a round trip.
+func TestEgressSMTPBlockedByDefault(t *testing.T) {
+	if NewConfig().WithDefaultValues().Egress.AllowSMTP {
+		t.Fatal("SMTP must be blocked by default")
+	}
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, ConfigFileName)
+	if err := os.WriteFile(path, []byte("[node]\nmoniker = \"test node\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	v := viper.New()
+	v.SetConfigFile(path)
+	cfg, err := ReadInConfig(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Egress == nil || cfg.Egress.AllowSMTP {
+		t.Fatalf("egress read from a file without the section: %+v", cfg.Egress)
+	}
+
+	cfg.Egress.AllowSMTP = true
+	if err := cfg.SaveToPath(path); err != nil {
+		t.Fatal(err)
+	}
+	if data, _ := os.ReadFile(path); !strings.Contains(string(data), "[egress]\n") ||
+		!strings.Contains(string(data), "allow_smtp = true\n") {
+		t.Fatalf("rendered file:\n%s", data)
+	}
+	v = viper.New()
+	v.SetConfigFile(path)
+	if back, err := ReadInConfig(v); err != nil || !back.Egress.AllowSMTP {
+		t.Fatalf("read back %+v, %v", back.Egress, err)
+	}
+}

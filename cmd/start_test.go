@@ -16,3 +16,20 @@ func TestHnsdArgs(t *testing.T) {
 		t.Fatalf("hnsd args: %s", got)
 	}
 }
+
+// TestAPIPort: the port tunnel clients may still reach on the node, taken
+// from the API's listen address.
+func TestAPIPort(t *testing.T) {
+	for in, want := range map[string]uint16{
+		"0.0.0.0:8585": 8585,
+		"[::]:443":     443,
+		":7777":        7777,
+		"0.0.0.0":      0,
+		"0.0.0.0:http": 0,
+		"":             0,
+	} {
+		if got := apiPort(in); got != want {
+			t.Errorf("apiPort(%q) = %d, want %d", in, got, want)
+		}
+	}
+}
