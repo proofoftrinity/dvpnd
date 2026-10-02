@@ -8,7 +8,8 @@
 #   2. builds dvpnd from source at a release tag and installs the binary
 #   3. writes the configuration and the protocol file
 #   4. creates (or recovers) the operator key and a self-signed TLS certificate
-#   5. opens the firewall and installs the systemd unit
+#   5. opens the firewall, creates the dvpnd-proxy account and installs the
+#      systemd unit
 #
 # Run it as root:
 #
@@ -442,6 +443,16 @@ if [[ "${FIREWALL}" -eq 1 ]]; then
     warn "ufw could not be enabled (no netfilter access?); open the ports listed below yourself"
   fi
   ufw status | sed 's/^/  /'
+fi
+
+# ---------------------------------------------------------------- proxy account
+
+# The node runs the proxy daemons as this account, and OpenVPN drops to it
+# once its tunnel is up; without it they run as root.
+if ! id dvpnd-proxy >/dev/null 2>&1; then
+  log "Creating the dvpnd-proxy system account"
+  useradd --system --user-group --no-create-home --home-dir /nonexistent \
+    --shell /usr/sbin/nologin dvpnd-proxy
 fi
 
 # ---------------------------------------------------------------- service

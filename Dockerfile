@@ -49,7 +49,11 @@ COPY --from=build /tmp/hysteria /usr/local/bin/hysteria
 COPY --from=build /root/amneziawg-go/amneziawg-go /usr/bin/amneziawg-go
 COPY --from=build /root/awg-install/usr/bin/awg /root/awg-install/usr/bin/awg-quick /usr/bin/
 
+# dvpnd-proxy is the account the node runs the proxy daemons as, and that
+# OpenVPN drops to (services/common/runtime.go).
 RUN apk add --no-cache iptables openvpn unbound-libs v2ray wireguard-tools && \
-    rm -rf /etc/v2ray/ /usr/share/v2ray/
+    rm -rf /etc/v2ray/ /usr/share/v2ray/ && \
+    addgroup -S dvpnd-proxy && \
+    adduser -S -D -H -G dvpnd-proxy -h /nonexistent -s /sbin/nologin dvpnd-proxy
 
 CMD ["process"]

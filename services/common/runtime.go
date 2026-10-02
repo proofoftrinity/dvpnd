@@ -87,13 +87,15 @@ var lookupProxyUser = func() (*ProxyUser, error) {
 }
 
 // PrepareRuntime picks the runtime directory and the daemons' account and
-// creates the directory. Under systemd the directory is the unit's
-// RuntimeDirectory; a node running as root otherwise uses /run/dvpnd, since
-// the proxy account cannot enter root's home; any other node uses run/ in
-// its home. The directory is readable by the proxy account's group only.
-func PrepareRuntime(home string, euid int) (Runtime, error) {
+// creates the directory. daemon says whether the service runs a daemon that
+// can drop to the proxy account; for the others the account is left out.
+// Under systemd the directory is the unit's RuntimeDirectory; a node running
+// as root otherwise uses /run/dvpnd, since the proxy account cannot enter
+// root's home; any other node uses run/ in its home. The directory is
+// readable by the proxy account's group only.
+func PrepareRuntime(home string, euid int, daemon bool) (Runtime, error) {
 	var rt Runtime
-	if euid == 0 {
+	if euid == 0 && daemon {
 		if u, err := lookupProxyUser(); err == nil {
 			rt.Proxy = u
 		}

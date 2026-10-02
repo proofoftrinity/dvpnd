@@ -256,13 +256,13 @@ func StartCmd() *cobra.Command {
 			// The protocol daemons read their files from the runtime
 			// directory and, when the node runs as root and the proxy account
 			// exists, run as that account.
-			rt, err := common.PrepareRuntime(home, os.Geteuid())
+			rt, err := common.PrepareRuntime(home, os.Geteuid(), protocol.Daemon)
 			if err != nil {
 				return err
 			}
 			common.SetRuntime(rt)
 			switch {
-			case rt.Proxy != nil && protocol.Daemon:
+			case rt.Proxy != nil:
 				log.Info("Protocol daemons run unprivileged", "account", common.ProxyUserName, "runtime", rt.Dir)
 			case os.Geteuid() == 0 && protocol.Daemon:
 				log.Error("Protocol daemons run as root: create the " + common.ProxyUserName +

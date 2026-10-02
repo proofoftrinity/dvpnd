@@ -259,6 +259,11 @@ TCP port 25 unless `[egress] allow_smtp = true`. None of this depends on ufw.
 - V2Ray, XRAY and Hysteria2 enforce it inside the proxy: a routing rule to a blackhole, or
   Hysteria2's ACL. A destination given as a name is resolved and matched by its addresses
   too, so `localhost` or any name that points into a blocked network is refused.
+- On a host, where they run as `dvpnd-proxy` (§6), the kernel holds them to it too: the
+  `DVPND-PROXY` chain in OUTPUT rejects whatever that account dials in a blocked network or
+  on port 25, so even a name whose answer changes between the proxy's check and its dial
+  (DNS rebinding) cannot get through. It lets the account reach the resolvers in
+  `/etc/resolv.conf` and Hysteria2's authentication hook on loopback.
 - WireGuard, AmneziaWG and OpenVPN enforce it with two iptables chains (and the same in
   ip6tables) per tunnel interface, jumped to from the top of FORWARD and INPUT:
   `DVPND-FWD-<interface>` and `DVPND-IN-<interface>`. From the tunnel the host accepts only
@@ -312,9 +317,11 @@ Before the first start, install what the protocol needs on the host:
   `sudo install -m 0755 hysteria-linux-amd64 /usr/local/bin/hysteria`; `hysteria version`
   must work. The node refuses to start when the binary is missing.
 
-Then:
+Then create the account the protocol daemons run as, and install the unit:
 
 ```sh
+sudo useradd --system --user-group --no-create-home --home-dir /nonexistent \
+  --shell /usr/sbin/nologin dvpnd-proxy
 sudo cp scripts/dvpnd.service /etc/systemd/system/dvpnd.service
 sudo systemctl daemon-reload && sudo systemctl enable --now dvpnd
 journalctl -u dvpnd -f
@@ -322,8 +329,17 @@ journalctl -u dvpnd -f
 
 The unit sandboxes the node: it still runs as root (tunnels and NAT need it), but sees the
 system read-only except its home and the tunnel configuration folders (`/etc/wireguard`,
-`/etc/amnezia`), gets a private `/tmp` and cannot gain privileges. With a node home other
-than `/root/.dvpnd`, set it in both `ExecStart` and `ReadWritePaths` (the installer does).
+`/etc/amnezia`), gets a private `/tmp`, cannot gain privileges, keeps only the capabilities a
+node uses and makes only the system calls a service makes. With a node home other than
+`/root/.dvpnd`, set it in both `ExecStart` and `ReadWritePaths` (the installer does).
+
+The protocol daemons do not run as root. V2Ray, XRAY and Hysteria2 run as `dvpnd-proxy`, read
+their configuration and a copy of the TLS key from `/run/dvpnd`, and an iptables chain for
+that account (`DVPND-PROXY` in OUTPUT) holds whatever they dial to the egress policy (§5).
+OpenVPN opens its tunnel as root and then drops to `dvpnd-proxy`; the node drives it over a
+unix socket in `/run/dvpnd` that only root may use. Without the account the daemons run as
+root and the node logs how to create it. Check with `ps -eo user,comm | grep -E
+'xray|v2ray|hysteria|openvpn'`.
 
 First start: the node measures its link unless `[bandwidth]` declares it (one to two minutes
 and several gigabytes, then reused for a week), registers (`MsgRegisterNode`),
@@ -449,8 +465,10 @@ docker run --detach --name dvpnd --restart unless-stopped \
 ```
 
 **OpenVPN node:** the AmneziaWG command above with `openvpn.toml`'s `listen_port` published
-as `/udp` or `/tcp` to match `proto`. The tun device and NET_ADMIN are what OpenVPN needs;
-the data channel runs in userspace inside the container.
+as `/udp` or `/tcp` to match `proto`, plus `--cap-add SETUID --cap-add SETGID --cap-add CHOWN
+--cap-add KILL`. The tun device and NET_ADMIN are what OpenVPN needs; the data channel runs
+in userspace inside the container, and the server drops to the image's `dvpnd-proxy` account
+once its tunnel is up (the four extra capabilities let it, and let the node stop it).
 
 **V2Ray node:**
 
@@ -459,13 +477,17 @@ docker run --detach --name dvpnd --restart unless-stopped \
   --log-opt max-size=50m --log-opt max-file=3 \
   --volume /root/.dvpnd:/root/.dvpnd \
   --cap-drop ALL --cap-add NET_BIND_SERVICE \
+  --cap-add NET_ADMIN --cap-add NET_RAW \
+  --cap-add SETUID --cap-add SETGID --cap-add CHOWN --cap-add KILL \
   --publish 8585:8585/tcp \
   --publish <listen_port>:<listen_port>/tcp \
   dvpnd process start
 ```
 
-No modules, no sysctls, no NET_ADMIN: the proxy is a plain process on a port. Publish the
-same TCP port as `v2ray.toml`'s `listen_port`.
+No modules, no sysctls: the proxy is a plain process on a port. The node runs it as the
+image's `dvpnd-proxy` account (SETUID, SETGID, CHOWN for its runtime files, KILL to stop it)
+behind an iptables chain for that account inside the container's own network namespace
+(NET_ADMIN, NET_RAW); see §5. Publish the same TCP port as `v2ray.toml`'s `listen_port`.
 
 **XRAY node:** the same command with `xray.toml`'s `listen_port`. The image pins xray
 26.3.27 and checks its sha256 at build time.

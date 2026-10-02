@@ -66,7 +66,7 @@ func TestPrepareRuntimeAsAUser(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("RUNTIME_DIRECTORY", "")
 
-	rt, err := PrepareRuntime(home, 1000)
+	rt, err := PrepareRuntime(home, 1000, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,7 +97,7 @@ func TestPrepareRuntimeAsAUser(t *testing.T) {
 
 	// Under systemd the unit's RuntimeDirectory wins.
 	t.Setenv("RUNTIME_DIRECTORY", filepath.Join(home, "systemd")+":/other")
-	if rt, err = PrepareRuntime(home, 1000); err != nil || rt.Dir != filepath.Join(home, "systemd") {
+	if rt, err = PrepareRuntime(home, 1000, true); err != nil || rt.Dir != filepath.Join(home, "systemd") {
 		t.Fatalf("runtime %+v: %v", rt, err)
 	}
 }
@@ -115,7 +115,7 @@ func TestPrepareRuntimeAsRoot(t *testing.T) {
 	t.Cleanup(func() { lookupProxyUser = saved })
 	t.Setenv("RUNTIME_DIRECTORY", filepath.Join(t.TempDir(), "run"))
 
-	rt, err := PrepareRuntime(t.TempDir(), 0)
+	rt, err := PrepareRuntime(t.TempDir(), 0, true)
 	if err != nil || rt.Proxy == nil {
 		t.Fatalf("runtime %+v: %v", rt, err)
 	}

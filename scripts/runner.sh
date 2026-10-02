@@ -549,7 +549,10 @@ function cmd_start {
   node_type=$(awk -F '[="]' '{gsub(/ /,"")} /\[node\]/{f=1} f && /type/{print $3;exit}' "${NODE_DIR}/config.toml")
 
   # Proxy node types run as a plain process on one port: no modules, no
-  # sysctls, every capability dropped.
+  # sysctls. The node starts the proxy as the dvpnd-proxy account (SETUID,
+  # SETGID; CHOWN for its runtime files; KILL to stop it) behind an OUTPUT
+  # chain for that account (NET_ADMIN, NET_RAW); every other capability is
+  # dropped.
   local proxy_port= proxy_proto=tcp
   [[ "${node_type}" == "v2ray" ]] &&
     proxy_port=$(awk -F '=' '{gsub(/ /,"")} /\[vmess\]/{f=1} f && /listen_port/{print $2;exit}' "${NODE_DIR}/v2ray.toml")
@@ -567,6 +570,12 @@ function cmd_start {
       --volume "${NODE_DIR}:/root/.dvpnd" \
       --cap-drop ALL \
       --cap-add NET_BIND_SERVICE \
+      --cap-add NET_ADMIN \
+      --cap-add NET_RAW \
+      --cap-add SETUID \
+      --cap-add SETGID \
+      --cap-add CHOWN \
+      --cap-add KILL \
       --publish "${node_api_port}:${node_api_port}/tcp" \
       --publish "${proxy_port}:${proxy_port}/${proxy_proto}" \
       "${NODE_IMAGE}" process start
@@ -603,7 +612,9 @@ function cmd_start {
       "${NODE_IMAGE}" process start
   fi
   if [[ "${node_type}" == "openvpn" ]]; then
-    # A tun device, NAT and forwarding, no kernel module.
+    # A tun device, NAT and forwarding, no kernel module. The server drops to
+    # the dvpnd-proxy account once its tunnel is up (SETUID, SETGID; CHOWN
+    # for its runtime files; KILL to stop it).
     port=$(awk -F '=' '{gsub(/ /,"")} /listen_port/{print $2;exit}' "${NODE_DIR}/openvpn.toml")
     proto=$(awk -F '[="]' '{gsub(/ /,"")} /^proto/{print $3;exit}' "${NODE_DIR}/openvpn.toml")
     docker run \
@@ -618,6 +629,10 @@ function cmd_start {
       --cap-add NET_ADMIN \
       --cap-add NET_BIND_SERVICE \
       --cap-add NET_RAW \
+      --cap-add SETUID \
+      --cap-add SETGID \
+      --cap-add CHOWN \
+      --cap-add KILL \
       --sysctl net.ipv4.ip_forward=1 \
       --sysctl net.ipv6.conf.all.disable_ipv6=0 \
       --sysctl net.ipv6.conf.all.forwarding=1 \
