@@ -74,7 +74,7 @@ func admit(ctx *context.Context, req admitRequest) (*admitResult, *apiError) {
 	ctx.Database().Model(&types.Session{}).Where(&types.Session{Key: req.PeerKey()}).First(&item)
 	if item.ID != 0 {
 		return nil, newAPIError(http.StatusConflict, 3,
-			fmt.Errorf("key %s for service already exists", req.PeerKey()))
+			fmt.Errorf("key %s for service already exists", types.KeyTag(req.PeerKey())))
 	}
 
 	session, err := ctx.Client().QuerySession(req.ID)
@@ -179,7 +179,7 @@ func admit(ctx *context.Context, req admitRequest) (*admitResult, *apiError) {
 	if err != nil {
 		return nil, newAPIError(http.StatusInternalServerError, 10, err)
 	}
-	ctx.Log().Info("Added a new peer", "key", req.PeerKey(), "count", ctx.Service().PeerCount())
+	ctx.Log().Info("Added a new peer", "key", types.KeyTag(req.PeerKey()), "count", ctx.Service().PeerCount())
 
 	// Start the reported totals from what the chain already holds: a client
 	// that reconnects after a node restart keeps its session, and the chain

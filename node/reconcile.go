@@ -34,6 +34,7 @@ func (n *Node) ReconcileSessions() error {
 	var items []types.Session
 	n.Database().Model(&types.Session{}).Find(&items)
 	if len(items) == 0 {
+		n.compactDatabase()
 		return nil
 	}
 
@@ -65,7 +66,12 @@ func (n *Node) ReconcileSessions() error {
 		}
 	}
 
-	return n.clearSessions()
+	if err := n.clearSessions(); err != nil {
+		return err
+	}
+	n.compactDatabase()
+
+	return nil
 }
 
 // sessionNeedsReport reports whether a stored session should get a final
@@ -83,4 +89,15 @@ func sessionNeedsReport(local types.Session, onChain chainSessionView) bool {
 func (n *Node) clearSessions() error {
 	return n.Database().Session(&gorm.Session{AllowGlobalUpdate: true}).
 		Unscoped().Delete(&types.Session{}).Error
+}
+
+// compactDatabase rebuilds the database file once the session table is empty.
+// The file is opened with secure_delete, but rows deleted by an earlier
+// release, before that was on, can still sit in free pages with their wallet
+// addresses and peer keys; VACUUM writes the file afresh without them. The
+// file holds a few pages, so this is quick, and a failure only gets logged.
+func (n *Node) compactDatabase() {
+	if err := n.Database().Exec("VACUUM").Error; err != nil {
+		n.Log().Error("could not compact the database", "error", err)
+	}
 }

@@ -6,9 +6,24 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"sync/atomic"
 	"syscall"
 	"time"
 )
+
+// verbose says whether the protocol daemons may log per-connection detail:
+// client addresses and, for the proxies, the destinations clients reach. It
+// follows the node's own log level, so a node at the default level keeps
+// neither in its journal; an operator chasing a fault runs the node with
+// --log_level debug and gets the daemons' usual output back.
+var verbose atomic.Bool
+
+// SetVerbose is called once by the start command, before the service writes
+// its daemon's configuration.
+func SetVerbose(v bool) { verbose.Store(v) }
+
+// Verbose reports what SetVerbose stored.
+func Verbose() bool { return verbose.Load() }
 
 // Process is a protocol's child process (a proxy or VPN daemon) with the
 // lifecycle every service needs: start, reap on exit, stop politely.

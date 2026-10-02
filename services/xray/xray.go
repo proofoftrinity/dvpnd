@@ -111,6 +111,7 @@ func (s *XRay) Init(home string) (err error) {
 		API:         s.config.API,
 		TLSCertPath: filepath.Join(home, "tls.crt"),
 		TLSKeyPath:  filepath.Join(home, "tls.key"),
+		LogLevel:    logLevel(),
 	}
 
 	security := types.TransportSecurityReality

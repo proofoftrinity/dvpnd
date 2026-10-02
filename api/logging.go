@@ -40,9 +40,15 @@ func (w *bodyCapture) Write(b []byte) (int, error) {
 	return w.ResponseWriter.Write(b)
 }
 
-// logRefusals logs every request the node answers with an error status:
-// who asked, what for, and the reason. A node operator otherwise has no way
-// to see why a client or an aggregator's probe was turned away.
+// logRefusals logs every request the node answers with an error status: what
+// was asked and the reason given. A node operator otherwise has no way to see
+// why a client or an aggregator's probe was turned away.
+//
+// The client's IP address goes only into the debug line every request gets.
+// It is the one thing here the public chain does not already show next to the
+// session, so a node at the default log level keeps no client addresses. It
+// is the address the connection came from (RemoteIP), never a forwarding
+// header the client could write itself.
 func logRefusals(ctx *context.Context) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		w := &bodyCapture{ResponseWriter: c.Writer}
@@ -51,15 +57,14 @@ func logRefusals(ctx *context.Context) gin.HandlerFunc {
 		c.Next()
 
 		status := c.Writer.Status()
+		ctx.Log().Debug("Request answered",
+			"method", c.Request.Method,
+			"path", c.Request.URL.Path,
+			"status", status,
+			"client", c.RemoteIP(),
+			"agent", c.Request.UserAgent(),
+		)
 		if status < http.StatusBadRequest {
-			ctx.Log().Debug("Request served",
-				"method", c.Request.Method,
-				"path", c.Request.URL.Path,
-				"status", status,
-				"client", c.ClientIP(),
-				"agent", c.Request.UserAgent(),
-			)
-
 			return
 		}
 
@@ -67,7 +72,6 @@ func logRefusals(ctx *context.Context) gin.HandlerFunc {
 			"method", c.Request.Method,
 			"path", c.Request.URL.Path,
 			"status", status,
-			"client", c.ClientIP(),
 			"agent", c.Request.UserAgent(),
 			"reply", w.body.String(),
 		)

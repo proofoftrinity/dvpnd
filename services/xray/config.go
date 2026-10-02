@@ -4,6 +4,8 @@ package xray
 
 import (
 	"strings"
+
+	"github.com/trinitystake/dvpnd/v9/services/common"
 )
 
 // configTemplate is the xray server configuration the node writes at start.
@@ -17,7 +19,7 @@ var configTemplate = strings.TrimSpace(`
 {
     "log": {
         "access": "none",
-        "loglevel": "warning"
+        "loglevel": "{{ .LogLevel }}"
     },
     "api": {
         "tag": "api",
@@ -132,4 +134,16 @@ type templateData struct {
 
 	TLSCertPath string
 	TLSKeyPath  string
+	LogLevel    string
+}
+
+// logLevel is xray's error-log level. Its warnings carry client addresses and
+// the destinations clients reach, so they are kept only when the node runs at
+// debug; otherwise only errors are logged. The access log stays off either way.
+func logLevel() string {
+	if common.Verbose() {
+		return "warning"
+	}
+
+	return "error"
 }

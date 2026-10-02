@@ -275,3 +275,31 @@ func TestStartStop(t *testing.T) {
 		t.Fatal("Stop before Start must fail")
 	}
 }
+
+// TestVerbFollowsNodeLogLevel: OpenVPN logs every client's address at its
+// usual verb 3, so the node asks for that only when it runs at debug itself.
+func TestVerbFollowsNodeLogLevel(t *testing.T) {
+	stubBinary(t)
+	t.Cleanup(func() { common.SetVerbose(false) })
+
+	for _, tc := range []struct {
+		verbose bool
+		want    string
+	}{
+		{verbose: false, want: "verb 0\n"},
+		{verbose: true, want: "verb 3\n"},
+	} {
+		common.SetVerbose(tc.verbose)
+		dir, _ := home(t, ovpntypes.ProtoUDP, false)
+		if err := NewOpenVPN().Init(dir); err != nil {
+			t.Fatal(err)
+		}
+		raw, err := os.ReadFile(filepath.Join(dir, "openvpn_server.conf"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(raw), tc.want) {
+			t.Errorf("verbose %v: server.conf lacks %q:\n%s", tc.verbose, tc.want, raw)
+		}
+	}
+}

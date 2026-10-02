@@ -181,6 +181,20 @@ func jsonString(v string) string {
 	return string(b)
 }
 
+// serverArgs is the hysteria command line. Its info level logs every client's
+// address as it connects, and its warnings the destinations clients fail to
+// reach, so only errors are logged unless the node runs at debug. The update
+// check is off: the node runs a pinned build and calls no outside service the
+// operator did not choose.
+func serverArgs(configPath string) []string {
+	level := "error"
+	if common.Verbose() {
+		level = "info"
+	}
+
+	return []string{"server", "--disable-update-check", "--log-level", level, "-c", configPath}
+}
+
 // Start serves the authentication hook, then launches the server. The hook
 // must be up first: the server may take its first client at once.
 func (s *Hysteria) Start() error {
@@ -200,7 +214,7 @@ func (s *Hysteria) Start() error {
 		close(s.authDone)
 	}()
 
-	s.process, err = common.StartProcess(binaryName, []string{"server", "-c", s.configPath}, nil)
+	s.process, err = common.StartProcess(binaryName, serverArgs(s.configPath), nil)
 	if err != nil {
 		_ = s.auth.Close()
 

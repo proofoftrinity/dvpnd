@@ -32,22 +32,40 @@ func TestLogRefusals(t *testing.T) {
 	serve := func(method, path string) {
 		req := httptest.NewRequest(method, path, nil)
 		req.Header.Set("User-Agent", "probe/1.0")
+		req.Header.Set("X-Forwarded-For", "198.51.100.7")
 		req.RemoteAddr = "203.0.113.9:4242"
 		r.ServeHTTP(httptest.NewRecorder(), req)
 	}
 
 	serve(http.MethodGet, "/ok")
-	if out := buf.String(); !strings.HasPrefix(out, "D[") || !strings.Contains(out, "Request served") || strings.Contains(out, "refused") {
+	if out := buf.String(); !strings.HasPrefix(out, "D[") || !strings.Contains(out, "Request answered") || strings.Contains(out, "refused") {
 		t.Fatalf("a successful request is logged at debug level only: %s", out)
 	}
 	buf.Reset()
 
 	serve(http.MethodPost, "/")
-	out := buf.String()
-	for _, want := range []string{"Request refused", "method=POST", "path=/", "status=400", "client=203.0.113.9", "agent=probe/1.0", "signature does not verify"} {
-		if !strings.Contains(out, want) {
-			t.Errorf("log lacks %q: %s", want, out)
+	var debugLine, errorLine string
+	for _, line := range strings.Split(buf.String(), "\n") {
+		switch {
+		case strings.HasPrefix(line, "D[") && strings.Contains(line, "Request answered"):
+			debugLine = line
+		case strings.HasPrefix(line, "E[") && strings.Contains(line, "Request refused"):
+			errorLine = line
 		}
+	}
+	for _, want := range []string{"method=POST", "path=/", "status=400", "agent=probe/1.0", "signature does not verify"} {
+		if !strings.Contains(errorLine, want) {
+			t.Errorf("refusal line lacks %q: %s", want, errorLine)
+		}
+	}
+	if strings.Contains(errorLine, "203.0.113.9") || strings.Contains(errorLine, "198.51.100.7") {
+		t.Errorf("the refusal line must not carry the client's address: %s", errorLine)
+	}
+	if !strings.Contains(debugLine, "client=203.0.113.9") {
+		t.Errorf("the debug line must carry the connection's address: %s", debugLine)
+	}
+	if strings.Contains(debugLine, "198.51.100.7") {
+		t.Errorf("a forwarding header must not stand in for the client's address: %s", debugLine)
 	}
 
 	buf.Reset()

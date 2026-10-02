@@ -3,6 +3,9 @@
 package node
 
 import (
+	"bytes"
+	"os"
+	"path/filepath"
 	"testing"
 
 	sdkmath "cosmossdk.io/math"
@@ -74,5 +77,61 @@ func TestClearSessions(t *testing.T) {
 	n.Database().Unscoped().Model(&types.Session{}).Count(&count)
 	if count != 0 {
 		t.Fatalf("soft-deleted rows remain: %d", count)
+	}
+}
+
+// TestDeletedSessionsLeaveNoTrace checks the database file itself, not only
+// the table: a cleared session's wallet address and peer key must be gone
+// from the bytes on disk. A file opened with secure_delete is clean at once;
+// one written without it (by an earlier release) still holds them until
+// compactDatabase runs.
+func TestDeletedSessionsLeaveNoTrace(t *testing.T) {
+	const address, key = "sent1tracemarkeraddress", "tracemarkerpeerkey"
+
+	for _, tc := range []struct {
+		name      string
+		params    string
+		compact   bool
+		wantTrace bool
+	}{
+		{name: "secure_delete", params: "?_secure_delete=on"},
+		{name: "earlier release, compacted", compact: true},
+		{name: "earlier release, not compacted", wantTrace: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "data.db")
+			db, err := gorm.Open(sqlite.Open(path+tc.params), &gorm.Config{Logger: gormlogger.Discard})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := db.AutoMigrate(&types.Session{}); err != nil {
+				t.Fatal(err)
+			}
+			db.Create(&types.Session{ID: 1, Key: key, Address: address})
+
+			n := NewNode(context.NewContext().WithDatabase(db).WithLogger(cmtlog.NewNopLogger()))
+			if err := n.clearSessions(); err != nil {
+				t.Fatal(err)
+			}
+			if tc.compact {
+				n.compactDatabase()
+			}
+			sqlDB, err := db.DB()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := sqlDB.Close(); err != nil {
+				t.Fatal(err)
+			}
+
+			raw, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			trace := bytes.Contains(raw, []byte(address)) || bytes.Contains(raw, []byte(key))
+			if trace != tc.wantTrace {
+				t.Fatalf("deleted session left in the file: %v, want %v", trace, tc.wantTrace)
+			}
+		})
 	}
 }

@@ -613,6 +613,20 @@ func (c *Config) String() string {
 	return buf.String()
 }
 
+// Redacted is the configuration as the node logs it: a copy with the GeoIP
+// token, its only secret, blanked. Logs travel further than the config file
+// (the journal, docker logs, a pasted support request).
+func (c *Config) Redacted() *Config {
+	v := *c
+	if c.GeoIP != nil && c.GeoIP.Token != "" {
+		geoip := *c.GeoIP
+		geoip.Token = "<redacted>"
+		v.GeoIP = &geoip
+	}
+
+	return &v
+}
+
 func ReadInConfig(v *viper.Viper) (*Config, error) {
 	config := NewConfig().WithDefaultValues()
 	if err := v.ReadInConfig(); err != nil {

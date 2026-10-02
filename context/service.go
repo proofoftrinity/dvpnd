@@ -1,22 +1,25 @@
 // SPDX-License-Identifier: Apache-2.0
+// Modified from sentinel-official/dvpn-node @ 62bde16 (2024-01-25). See NOTICE.
 
 package context
 
 import (
 	"encoding/base64"
+
+	"github.com/trinitystake/dvpnd/v9/types"
 )
 
 func (c *Context) RemovePeer(key string) error {
-	c.Log().Info("Removing the peer from service", "key", key)
+	c.Log().Info("Removing the peer from service", "key", types.KeyTag(key))
 
 	data, err := base64.StdEncoding.DecodeString(key)
 	if err != nil {
-		c.Log().Error("failed to decode the key", "error", err, "key", key)
+		c.Log().Error("failed to decode the key", "error", err, "key", types.KeyTag(key))
 		return err
 	}
 
 	if err = c.Service().RemovePeer(data); err != nil {
-		c.Log().Error("failed to remove the peer from service", "error", err, "data", data)
+		c.Log().Error("failed to remove the peer from service", "error", err, "key", types.KeyTag(key))
 		return err
 	}
 
@@ -26,7 +29,7 @@ func (c *Context) RemovePeer(key string) error {
 func (c *Context) HasPeer(key string) (bool, error) {
 	data, err := base64.StdEncoding.DecodeString(key)
 	if err != nil {
-		c.Log().Error("failed to decode the key", "error", err, "key", key)
+		c.Log().Error("failed to decode the key", "error", err, "key", types.KeyTag(key))
 		return false, err
 	}
 
@@ -39,7 +42,7 @@ func (c *Context) RemovePeerIfExists(key string) error {
 		return err
 	}
 	if !ok {
-		c.Log().Debug("Peer does not exist", "key", key)
+		c.Log().Debug("Peer does not exist", "key", types.KeyTag(key))
 		return nil
 	}
 

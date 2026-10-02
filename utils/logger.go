@@ -87,3 +87,11 @@ func PrepareLogger() (cmtlog.Logger, error) {
 			Logger(),
 	}, nil
 }
+
+// DebugLogging reports whether the node logs at debug level or finer, the
+// level at which an operator has asked for per-connection detail.
+func DebugLogging() bool {
+	level, err := zerolog.ParseLevel(viper.GetString(flags.FlagLogLevel))
+
+	return err == nil && level <= zerolog.DebugLevel
+}

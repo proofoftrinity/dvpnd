@@ -4,6 +4,8 @@ package openvpn
 
 import (
 	"strings"
+
+	"github.com/trinitystake/dvpnd/v9/services/common"
 )
 
 // configTemplate is the server configuration the node writes at start. TLS
@@ -42,7 +44,7 @@ explicit-exit-notify 1
 management 127.0.0.1 {{ .ManagementPort }}
 management-client-auth
 auth-user-pass-optional
-verb 3
+verb {{ .Verb }}
 `) + "\n"
 
 // templateData is what the server configuration renders from.
@@ -59,4 +61,17 @@ type templateData struct {
 	ServerKey      string
 	TLSCrypt       string
 	ManagementPort uint16
+	Verb           int
+}
+
+// verb is the OpenVPN log level: 3 (its usual level, which logs every client's
+// address as it connects) only when the node runs at debug, otherwise 0, which
+// leaves fatal errors only. Connects and disconnects reach the node over the
+// management interface either way.
+func verb() int {
+	if common.Verbose() {
+		return 3
+	}
+
+	return 0
 }

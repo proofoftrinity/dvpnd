@@ -354,3 +354,23 @@ func TestHandshakePayload(t *testing.T) {
 		t.Fatalf("identity: %s/%d", s.Name(), s.Type())
 	}
 }
+
+// TestServerArgs: hysteria's info level logs every client's address, so the
+// node asks for it only when it runs at debug itself; the update check, an
+// outside call nobody chose, is always off.
+func TestServerArgs(t *testing.T) {
+	t.Cleanup(func() { common.SetVerbose(false) })
+
+	for _, tc := range []struct {
+		verbose bool
+		want    string
+	}{
+		{verbose: false, want: "server --disable-update-check --log-level error -c /h/c.yaml"},
+		{verbose: true, want: "server --disable-update-check --log-level info -c /h/c.yaml"},
+	} {
+		common.SetVerbose(tc.verbose)
+		if got := strings.Join(serverArgs("/h/c.yaml"), " "); got != tc.want {
+			t.Errorf("verbose %v: got %q, want %q", tc.verbose, got, tc.want)
+		}
+	}
+}

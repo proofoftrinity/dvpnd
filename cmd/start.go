@@ -34,6 +34,7 @@ import (
 	"github.com/trinitystake/dvpnd/v9/lite"
 	"github.com/trinitystake/dvpnd/v9/node"
 	"github.com/trinitystake/dvpnd/v9/services"
+	"github.com/trinitystake/dvpnd/v9/services/common"
 	"github.com/trinitystake/dvpnd/v9/types"
 	"github.com/trinitystake/dvpnd/v9/utils"
 )
@@ -69,6 +70,7 @@ func StartCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			common.SetVerbose(utils.DebugLogging())
 
 			if hint := types.LegacyHomeHint(home); hint != "" {
 				log.Info(hint)
@@ -89,7 +91,7 @@ func StartCmd() *cobra.Command {
 			}
 
 			if !skipConfigValidation {
-				log.Info("Validating the configuration", "data", config)
+				log.Info("Validating the configuration", "data", config.Redacted())
 				if err = config.Validate(); err != nil {
 					return err
 				}
@@ -226,7 +228,9 @@ func StartCmd() *cobra.Command {
 
 			log.Info("Opening the database", "path", databasePath)
 			database, err := gorm.Open(
-				sqlite.Open(databasePath),
+				// secure_delete zeroes deleted rows, so a session's wallet
+				// address and peer key do not linger in free pages of the file.
+				sqlite.Open(databasePath+"?_secure_delete=on"),
 				&gorm.Config{
 					Logger:      logger.Discard,
 					PrepareStmt: false,

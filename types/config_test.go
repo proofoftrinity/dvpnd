@@ -134,3 +134,21 @@ func TestConfigTemplateRenders(t *testing.T) {
 		}
 	}
 }
+
+func TestConfigRedacted(t *testing.T) {
+	c := NewConfig().WithDefaultValues()
+	c.GeoIP.Provider = "ipinfo"
+	c.GeoIP.Token = "s3cr3t-geoip-token"
+
+	if out := c.Redacted().String(); strings.Contains(out, "s3cr3t-geoip-token") || !strings.Contains(out, `token = "<redacted>"`) {
+		t.Fatalf("the logged configuration must not carry the token:\n%s", out)
+	}
+	if c.GeoIP.Token != "s3cr3t-geoip-token" {
+		t.Fatal("Redacted must not change the configuration it copies")
+	}
+
+	c.GeoIP.Token = ""
+	if out := c.Redacted().String(); !strings.Contains(out, `token = ""`) {
+		t.Fatalf("an empty token stays empty:\n%s", out)
+	}
+}

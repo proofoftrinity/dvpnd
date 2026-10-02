@@ -37,7 +37,7 @@ func (n *Node) jobSetSessions() error {
 			).First(&item)
 
 			if item.ID == 0 {
-				n.Log().Info("Unknown connected peer", "key", peers[i].Key)
+				n.Log().Info("Unknown connected peer", "key", types.KeyTag(peers[i].Key))
 				if err = n.RemovePeer(peers[i].Key); err != nil {
 					return err
 				}
@@ -46,7 +46,7 @@ func (n *Node) jobSetSessions() error {
 			}
 			upload, download, moved := reportedUsage(item, peers[i])
 			if !moved {
-				n.Log().Debug("The peer has not sent any data", "key", item.Key,
+				n.Log().Debug("The peer has not sent any data", "key", types.KeyTag(item.Key),
 					"update_at", item.UpdatedAt)
 				continue
 			}
@@ -70,7 +70,7 @@ func (n *Node) jobSetSessions() error {
 			)
 
 			if available.IsPositive() && consumed.GT(available) {
-				n.Log().Info("Peer allocation exceeded", "key", item.Key)
+				n.Log().Info("Peer allocation exceeded", "key", types.KeyTag(item.Key))
 				if err = n.RemovePeer(item.Key); err != nil {
 					return err
 				}
@@ -138,7 +138,7 @@ func (n *Node) jobUpdateSessions() error {
 			}
 
 			if session == nil {
-				n.Log().Info("Session no longer exists on the chain", "key", items[i].Key, "id", items[i].ID)
+				n.Log().Info("Session no longer exists on the chain", "key", types.KeyTag(items[i].Key), "id", items[i].ID)
 				removePeer, removeSession, skipUpdate = true, true, true
 			} else {
 				if items[i].Upload == session.GetUploadBytes().Int64() &&
@@ -148,7 +148,7 @@ func (n *Node) jobUpdateSessions() error {
 						removePeer = true
 					}
 
-					n.Log().Info("Stale peer connection", "key", items[i].Key,
+					n.Log().Info("Stale peer connection", "key", types.KeyTag(items[i].Key),
 						"created_at", items[i].CreatedAt, "status_at", session.GetStatusAt())
 				}
 				if !session.GetStatus().Equal(v1base.StatusActive) {
@@ -157,14 +157,14 @@ func (n *Node) jobUpdateSessions() error {
 						removeSession, skipUpdate = true, true
 					}
 
-					n.Log().Info("Invalid session status", "key", items[i].Key,
+					n.Log().Info("Invalid session status", "key", types.KeyTag(items[i].Key),
 						"id", session.GetID(), "status", session.GetStatus())
 				}
 				if max := session.GetMaxBytes(); max.IsPositive() {
 					used := sdkmath.NewInt(items[i].Upload + items[i].Download)
 					if used.GTE(max) {
 						removePeer = true
-						n.Log().Info("Session byte limit reached", "key", items[i].Key,
+						n.Log().Info("Session byte limit reached", "key", types.KeyTag(items[i].Key),
 							"id", session.GetID(), "max_bytes", max, "used", used)
 					}
 				}
@@ -179,7 +179,7 @@ func (n *Node) jobUpdateSessions() error {
 							removeSession, skipUpdate = true, true
 						}
 
-						n.Log().Info("Invalid subscription status", "key", items[i].Key,
+						n.Log().Info("Invalid subscription status", "key", types.KeyTag(items[i].Key),
 							"id", s.SubscriptionID)
 					}
 				}

@@ -348,3 +348,40 @@ func mustPayload(t *testing.T, s *XRay) interface{} {
 	}
 	return payload
 }
+
+// TestLogLevelFollowsNodeLogLevel: xray's warnings carry client addresses and
+// destinations, so they are kept only when the node runs at debug itself.
+func TestLogLevelFollowsNodeLogLevel(t *testing.T) {
+	stubBinary(t)
+	t.Cleanup(func() { common.SetVerbose(false) })
+
+	for _, tc := range []struct {
+		verbose bool
+		want    string
+	}{
+		{verbose: false, want: "error"},
+		{verbose: true, want: "warning"},
+	} {
+		common.SetVerbose(tc.verbose)
+		dir, _ := home(t, xraytypes.SecurityTLS)
+		if err := NewXRay().Init(dir); err != nil {
+			t.Fatal(err)
+		}
+		raw, err := os.ReadFile(filepath.Join(dir, "xray_config.json"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var doc struct {
+			Log struct {
+				Access   string `json:"access"`
+				LogLevel string `json:"loglevel"`
+			} `json:"log"`
+		}
+		if err := json.Unmarshal(raw, &doc); err != nil {
+			t.Fatal(err)
+		}
+		if doc.Log.LogLevel != tc.want || doc.Log.Access != "none" {
+			t.Errorf("verbose %v: log section %+v, want loglevel %q and no access log", tc.verbose, doc.Log, tc.want)
+		}
+	}
+}

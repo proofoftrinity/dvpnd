@@ -458,6 +458,17 @@ real traffic this way and reported it on chain.
 
 - **Logs:** `journalctl -u dvpnd` on the host, `docker logs dvpnd` in Docker. Every
   transaction logs its hash and code.
+- **What the log keeps about clients:** at the default level, no client IP addresses. A
+  refused request is logged with its path, status, user agent and the reason the client was
+  given. Peer keys appear as a short tag, because a proxy key is the client's password.
+  Session ids and wallet addresses are logged, since the chain already shows them for this
+  node. The OpenVPN, XRAY and Hysteria2 daemons log errors only. Run the node with
+  `--log_level debug` to chase a fault: request lines then carry the client's address, and
+  the daemons log at their usual level, which includes client addresses and (for the
+  proxies) the destinations clients reach. Switch back once done. `data.db` zeroes deleted
+  rows and is compacted at every start. journald keeps old lines until its size cap; to keep
+  less, set `MaxRetentionSec=7day` in `/etc/systemd/journald.conf` and
+  `sudo systemctl restart systemd-journald` (Docker: the 3×50MB cap in §7 already applies).
 - **Advertised bandwidth:** `curl -sk https://127.0.0.1:8585/status | jq .result.bandwidth`
   shows the figure and its `source`. `speedtest` is a measurement; the log has one
   `Speed test result` line per server used, and a `rejected: too close to be off this host's

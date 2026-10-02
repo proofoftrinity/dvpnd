@@ -139,6 +139,7 @@ func (s *OpenVPN) Init(home string) (err error) {
 		ServerKey:      s.pki.serverKeyPath(),
 		TLSCrypt:       s.pki.tlsCryptPath(),
 		ManagementPort: s.config.Management.Port,
+		Verb:           verb(),
 	}
 
 	t, err := template.New("openvpn_conf").Parse(configTemplate)
