@@ -80,6 +80,7 @@ Edit `~/.dvpnd/config.toml`:
 | `[node] remote_url` | `https://<public-ip>:8585` — this becomes the on-chain `remote_addrs` (`host:port`); clients connect to it directly |
 | `[node] listen_on` | `0.0.0.0:8585` |
 | `[handshake] enable` | `false` (the default) unless `hnsd` (Handshake DNS resolver) is installed, as in the Docker image; must be `false` on a proxy node (V2Ray, XRAY, Hysteria2). The resolver listens on the node's tunnel address only (e.g. `10.8.0.1:53` on WireGuard), so only connected clients reach it. Without `hnsd` the node logs that the resolver stays off and reports `handshake_dns: false`. With ufw, let clients reach it: `sudo ufw allow in on wg0 to any port 53` (`awg0`/`awg1`, `ovpn0` for those types) |
+| `[egress] allow_smtp` | `false` (the default). Clients never reach the node host, private or link-local networks, or each other (§5); outgoing mail to TCP port 25 is blocked too, because a node that relays anyone's mail lands on block lists and providers suspend it. Set `true` only if you accept that. |
 | `[geoip]` | Leave `provider = "auto"`: at start the node asks ipwho.is, then ip2location.io, for the location of its public IP and cross-checks the country against Cloudflare; a disagreement is logged. No key, no cost, and both services allow commercial use on their free tier. Check the result with `curl -sk https://127.0.0.1:8585/status \| jq .result.location` (`source` names the service that answered). The location a node reports is self-declared and nothing verifies it; clients use it to choose a node, so only if the lookup is wrong set `city`, `country` (name or ISO code), `latitude`, `longitude` to the server's real physical location. The node logs the contradiction and reports `source = "static"`. Do not use `ip-api` on a node that earns unless you pay for it: its free tier is non-commercial only (a paid key goes in `url`). `ipinfo` returns the country only on its free plan. |
 | `[bandwidth]` | Leave both at `0`: at start the node measures its link. It picks speed test servers by measured latency, discards any that answer from inside its own datacenter (common on cloud hosts: those measure the local network and can overstate the link several times over), and reports the lowest of two or three independent servers. That takes one to two minutes and moves several gigabytes on a fast link; the result is kept in `~/.dvpnd/bandwidth.json` and reused for a week, or until the public IP changes (delete the file to measure again). If you know what your provider sells you, set `download_mbps` and `upload_mbps` (a 1 Gbit/s port is `1000`) and the measurement is skipped. See which you got with `curl -sk https://127.0.0.1:8585/status | jq .result.bandwidth`: `source` is `speedtest`, `config` or `none`. Nothing verifies the figure and clients use it to choose a node: do not overstate it. |
 | `[chain] rpc_addresses` | comma-separated, tried in order; the defaults are public endpoints from the [chain registry](https://github.com/cosmos/chain-registry/blob/master/sentinel/chain.json). Put your own RPC first if you run one. An endpoint that answers with an HTTP redirect does not work with this client. |
@@ -109,7 +110,10 @@ Pick a fixed `listen_port` (TCP). `transport = "tcp"` is the only transport conf
 current client apps. `tls = true` wraps the VMess inbound in TLS using the node's
 `tls.crt`/`tls.key` from §4 and advertises the certificate's pin to clients; `false` relies
 on VMess's own encryption. The node needs the `v2ray` binary on `PATH` (see §6) and drives it
-over loopback port 23, so nothing else on the host may bind that port.
+over loopback `[api] port`, which `config init` picks at random; nothing else may bind it. A
+`v2ray.toml` written before `[api]` existed gets a new random port at every start; fix one
+with `dvpnd v2ray config set api.port <port>`. Clients cannot reach that port, or anything else
+on the host, through the proxy (§5).
 
 ### 2c. XRAY
 
@@ -131,9 +135,9 @@ it is wrapped:
   `config init --force`.
 
 `flow = true` enables XTLS Vision, which current clients support and expect. The node drives
-xray over loopback `[api] port`; nothing else may bind it. Destinations in private and
-loopback ranges are blocked for clients, so a client cannot reach that port or anything else
-on the host through the proxy. The node needs the `xray` binary on `PATH` (see §6).
+xray over loopback `[api] port`; nothing else may bind it. Clients cannot reach that port, or
+anything else on the host, through the proxy (§5). The node needs the `xray` binary on `PATH`
+(see §6).
 
 ### 2d. Hysteria2
 
@@ -242,6 +246,26 @@ WireGuard, AmneziaWG and OpenVPN only: peer traffic is NAT-ed through the uplink
 up, and it accepts established replies back into the tunnel itself, so a FORWARD policy of
 DROP (ufw's default, or a host where Docker is or was installed) is fine. Ports published by
 Docker bypass ufw: on a Docker host the ufw rules above only protect what is not published.
+
+**What clients can reach.** Every node type applies the same egress policy
+(`services/common/egress.go`): clients reach the internet, and nothing on the node host or
+around it. Blocked are the host itself (`127.0.0.0/8`, `::1`, `0.0.0.0/8`, `::`), private,
+shared and link-local networks (`10/8`, `172.16/12`, `192.168/16`, `100.64/10`,
+`169.254/16`, `fc00::/7`, `fe80::/10`, so also the provider's metadata service and other
+clients on the node), plus `192.0.0/24`, `198.18/15`, multicast and reserved space, and
+TCP port 25 unless `[egress] allow_smtp = true`. None of this depends on ufw.
+
+- V2Ray, XRAY and Hysteria2 enforce it inside the proxy: a routing rule to a blackhole, or
+  Hysteria2's ACL. A destination given as a name is resolved and matched by its addresses
+  too, so `localhost` or any name that points into a blocked network is refused.
+- WireGuard, AmneziaWG and OpenVPN enforce it with two iptables chains (and the same in
+  ip6tables) per tunnel interface, jumped to from the top of FORWARD and INPUT:
+  `DVPND-FWD-<interface>` and `DVPND-IN-<interface>`. From the tunnel the host accepts only
+  replies, DNS to the Handshake resolver when it runs, and the node API port. Services bound
+  to all of the host's addresses (SSH included) are not reachable through the tunnel. The
+  node creates the chains before the interface comes up and removes them when it stops; a
+  node that crashed leaves them behind, and the next start refills them in place. Inspect
+  them with `sudo iptables -S DVPND-FWD-wg0` (use your interface name).
 
 ## 6. Run as a service (recommended)
 

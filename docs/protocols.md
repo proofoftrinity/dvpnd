@@ -64,6 +64,13 @@ key on; the name is what `GET /` reports as `service_type`.
   peer with exactly that key, or its usage is never reported.
 - `RemovePeer` is called by the node (session expired, allocation exceeded, account
   evicted), never by the client.
+- Egress: a client reaches the internet and nothing on the node host or around it. One
+  policy in `services/common/egress.go` (the blocked IPv4 and IPv6 networks, `localhost` by
+  name, TCP 25 unless `[egress] allow_smtp`) is rendered by every service, so the protocols
+  cannot drift apart. Proxies render it into their own configuration and must match a
+  destination given as a name by its resolved addresses too. Tunnel services install it with
+  `common.TunnelEgress` (per-interface chains jumped to from the top of FORWARD and INPUT)
+  before the interface carries traffic, and remove it after.
 
 Per type:
 
@@ -86,8 +93,9 @@ whether Handshake DNS may run next to it). Everything else goes through the regi
 document's `service_type` and `service_metadata`, and both halves of the handshake.
 `services/common/` has what protocols share: UUID parsing for peer requests, the TLS
 certificate pin, a self-signed certificate generator, the generic config CLI built from a
-`ConfigSpec`, a child-process helper (start, reap, SIGTERM then kill), a peer set, and the
-NAT and forwarding rule set for tunnel interfaces. The WireGuard service exports its
+`ConfigSpec`, a child-process helper (start, reap, SIGTERM then kill), a peer set, the
+NAT and forwarding rule set for tunnel interfaces, and the egress policy with its tunnel
+firewall. The WireGuard service exports its
 uplink detection and forwarding switch for the other tunnel protocols.
 
 Outside the code, a protocol also needs a `scripts/runner.sh` branch, its binary in the
@@ -103,13 +111,17 @@ image, and a real session from a client, described in words only in the README.
 
 `wg-quick` brings `wg0` up from a rendered config; PostUp adds the FORWARD accept rules (both
 directions) and MASQUERADE on the uplink; peers via `wg set … allowed-ips …`; usage from
-`wg show … transfer`. IPv4 and optional IPv6 pools hand out tunnel addresses.
+`wg show … transfer`. IPv4 and optional IPv6 pools hand out tunnel addresses. The egress
+chains go in before `wg-quick up` and come out after `wg-quick down`; they sit ahead of the
+PostUp accept rules, which stay as they are.
 
 ### V2Ray (shipped)
 
 `v2ray run --config <json>` as a child process; VMess inbound on `listen_port`, optional TLS
 with the node's certificate (pin advertised); peers and usage over the gRPC control API on
-loopback. The control port is hard-coded to 23.
+loopback, on `[api] port` in `v2ray.toml` (it was fixed at 23 before the egress policy, and
+a port below 1024 needs root). Routing sends the egress policy to a blackhole with
+`domainStrategy: IPIfNonMatch`.
 
 ### XRAY (shipped)
 
@@ -117,8 +129,10 @@ Generalised from V2Ray: the same JSON shape with a VLESS inbound over raw TCP,
 `security = "tls"` (node certificate, pin advertised) or `"reality"` (x25519 key pair and
 short id generated at `config init`, `server_name` chosen by the operator, default
 `www.apple.com`), XTLS Vision on by default, control over xray's gRPC API on a configurable
-loopback port. Private and loopback destinations are blocked by explicit CIDRs (not
-`geoip:private`, which needs the asset file), so a client cannot reach the control port.
+loopback port. The egress policy is routed to a blackhole by explicit CIDRs (not
+`geoip:private`, which needs the asset file) with `domainStrategy: IPIfNonMatch`, so a
+destination given as a name is matched by its addresses as well and a client cannot reach
+the control port.
 
 The four API messages the node sends (`AlterInbound` with `AddUserOperation` /
 `RemoveUserOperation`, `QueryStats`) are encoded by hand with `protowire` in
@@ -141,8 +155,10 @@ statistics API files traffic under the session key directly. Usage comes from
 `GET /traffic?clear=1` (deltas, accumulated by the node; the server counts from the
 client's point of view: `tx` is the client's upload, `rx` its download, checked with a large
 download), removal is `POST /kick`. The node raises `net.core.rmem_max`/`wmem_max` on a host
-(not namespaced, so in Docker it is a host setting). Binary: release app/v2.10.0, sha256
-checked in the Dockerfile. Port hopping is out of scope.
+(not namespaced, so in Docker it is a host setting). The egress policy is an inline ACL of
+`reject(...)` rules (CIDRs, not `geoip:private`, which makes hysteria download a database);
+hysteria resolves a name before it matches, and reuses that address to dial. Binary: release
+app/v2.10.0, sha256 checked in the Dockerfile. Port hopping is out of scope.
 
 ### AmneziaWG (shipped)
 
@@ -225,7 +241,10 @@ otherwise, reads per-client bytes from `status 3` (received = the client's uploa
 its download), banks a connection's final counters from `>CLIENT:DISCONNECT` so a reconnect
 does not lose usage, and removes a peer with `client-kill <id> RESTART,…`, which makes the
 client reconnect at once and be denied. NAT and forwarding use the same rule set as
-WireGuard (`services/common/nat.go`), installed by the node around the server's lifetime.
+WireGuard (`services/common/nat.go`), installed by the node around the server's lifetime,
+with the egress chains installed before the server starts and removed after it ends.
+Without `client-to-client`, traffic between clients goes through the kernel and the egress
+chain drops it.
 
 Binary: `openvpn` from apk (2.7 in the image) and apt. The management port is a loopback TCP
 port without a password, as OpenVPN warns at start: on a dedicated node the only other user
