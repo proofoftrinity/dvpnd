@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/base64"
 	"net"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -34,17 +33,25 @@ type fakeAPI struct {
 	stall bool
 }
 
-func (f *fakeAPI) wait(ctx context.Context) {
+// wait blocks a stalled call until its deadline and fails it then; the
+// server's copy of the deadline can expire just before the client's, so a
+// stalled call must not go on to succeed.
+func (f *fakeAPI) wait(ctx context.Context) error {
 	f.mu.Lock()
 	stall := f.stall
 	f.mu.Unlock()
 	if stall {
 		<-ctx.Done()
+		return ctx.Err()
 	}
+
+	return nil
 }
 
 func (f *fakeAPI) AlterInbound(ctx context.Context, req *proxymancommand.AlterInboundRequest) (*proxymancommand.AlterInboundResponse, error) {
-	f.wait(ctx)
+	if err := f.wait(ctx); err != nil {
+		return nil, err
+	}
 	if req.GetTag() != "vmess" {
 		return nil, status.Errorf(codes.Unknown, "unknown inbound %q", req.GetTag())
 	}
@@ -69,7 +76,9 @@ func (f *fakeAPI) AlterInbound(ctx context.Context, req *proxymancommand.AlterIn
 }
 
 func (f *fakeAPI) GetStats(ctx context.Context, req *statscommand.GetStatsRequest) (*statscommand.GetStatsResponse, error) {
-	f.wait(ctx)
+	if err := f.wait(ctx); err != nil {
+		return nil, err
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	v, ok := f.stats[req.GetName()]
@@ -151,11 +160,13 @@ func TestAPICallsAreBounded(t *testing.T) {
 	t.Cleanup(func() { rpcTimeout = saved })
 
 	api, s := startFakeAPI(t)
+	api.mu.Lock()
 	api.stall = true
+	api.mu.Unlock()
 
 	start := time.Now()
 	_, err := s.AddPeer(append([]byte{0x01}, []byte("0123456789abcdef")...))
-	if err == nil || !strings.Contains(err.Error(), "DeadlineExceeded") {
+	if status.Code(err) != codes.DeadlineExceeded {
 		t.Fatalf("AddPeer against a stalled proxy: %v", err)
 	}
 	if elapsed := time.Since(start); elapsed > 5*time.Second {
