@@ -295,6 +295,11 @@ sudo systemctl daemon-reload && sudo systemctl enable --now dvpnd
 journalctl -u dvpnd -f
 ```
 
+The unit sandboxes the node: it still runs as root (tunnels and NAT need it), but sees the
+system read-only except its home and the tunnel configuration folders (`/etc/wireguard`,
+`/etc/amnezia`), gets a private `/tmp` and cannot gain privileges. With a node home other
+than `/root/.dvpnd`, set it in both `ExecStart` and `ReadWritePaths` (the installer does).
+
 First start: the node measures its link unless `[bandwidth]` declares it (one to two minutes
 and several gigabytes, then reused for a week), registers (`MsgRegisterNode`),
 marks itself active (`MsgUpdateNodeStatus`), starts its service (`wg0` up, or the proxy as a

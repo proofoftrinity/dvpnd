@@ -9,6 +9,14 @@
 # control group, a userspace tunnel (amneziawg-go) exits before the node can
 # take it down, its PostDown never runs and the NAT rules outlive the node.
 # Whatever is still running once the node has exited is killed.
+#
+# The sandbox below limits what root can reach rather than dropping root: the
+# system read-only (/usr, /boot, /etc except the tunnel configuration
+# folders), home directories read-only except the node's own, a private /tmp,
+# no privilege gain, and only the socket kinds a node uses. Kernel tunables and
+# modules stay reachable (the node switches on IP forwarding; a tunnel may need
+# its kernel module), and devices stay open (/dev/net/tun). A node home set
+# by hand goes in both ExecStart and ReadWritePaths.
 [Unit]
 Description=dvpnd - dVPN node for the Sentinel network
 After=network-online.target
@@ -18,11 +26,29 @@ Wants=network-online.target
 Type=simple
 User=root
 Environment=HOME=/root
+# Created outside the sandbox: the node writes the tunnel configuration there,
+# and a read-write path must exist before the sandbox is set up.
+ExecStartPre=+/bin/mkdir -p -m 0700 /etc/wireguard /etc/amnezia/amneziawg
 ExecStart=/usr/local/bin/dvpnd start --home /root/.dvpnd
 KillMode=mixed
 Restart=always
 RestartSec=15
 LimitNOFILE=65536
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=-/root/.dvpnd -/etc/wireguard -/etc/amnezia
+ProtectControlGroups=yes
+ProtectKernelLogs=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
 
 [Install]
 WantedBy=multi-user.target
