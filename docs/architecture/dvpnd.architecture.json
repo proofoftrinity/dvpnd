@@ -47,7 +47,7 @@
     ],
     "repository": {
       "url": "git@github.com:trinitystake/dvpnd.git",
-      "revision": "53c0f0c9e440eef66ef9b179dc42c8c15e05697f",
+      "revision": "7ee8c48db0114b09b4f0316a7e4da4f80d4ba034",
       "link_mode": "local-only"
     }
   },
@@ -92,6 +92,10 @@
         },
         {
           "path": "api/status/handlers.go"
+        },
+        {
+          "path": "utils/http.go",
+          "label": "server limits"
         }
       ]
     },
@@ -114,6 +118,10 @@
         },
         {
           "path": "api/session/handshake.go"
+        },
+        {
+          "path": "api/session/guard.go",
+          "label": "HTTPS only, attempt limit"
         }
       ]
     },
@@ -430,6 +438,7 @@
       "title": "Handshake",
       "items": [
         "POST / is signed with the session account key; no prior tx needed",
+        "HTTPS only, at most 30 attempts a minute per address",
         "The chain, not the node, says whether a session is active and paid"
       ]
     },
@@ -447,7 +456,8 @@
       "items": [
         "Clients pin the self-signed certificate; no CA involved",
         "Peers the database does not know are evicted every set_sessions tick",
-        "Runs as root, or with the four capabilities the Dockerfile keeps"
+        "Runs as root in a systemd sandbox, or with the four capabilities the Dockerfile keeps",
+        "No client IPs or peer keys in the log unless run at debug"
       ]
     }
   ]
