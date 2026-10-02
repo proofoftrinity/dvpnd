@@ -75,6 +75,7 @@ type OpenVPN struct {
 	process    *common.Process
 	mgmt       *management
 	nat        common.NAT
+	egress     common.TunnelEgress
 	configPath string
 
 	mu     sync.Mutex
@@ -158,6 +159,7 @@ func (s *OpenVPN) Init(home string) (err error) {
 	}
 
 	s.nat = common.NAT{Interface: s.config.Interface, Uplink: s.config.Uplink}
+	s.egress = common.TunnelEgress{Interface: s.config.Interface}
 
 	binary.BigEndian.PutUint16(s.info[0:], s.config.ListenPort)
 	s.info[2] = transportUDP
@@ -171,8 +173,6 @@ func (s *OpenVPN) Init(home string) (err error) {
 	return nil
 }
 
-// Start launches the server, attaches to its management interface (nothing
-// is admitted until the node is attached) and installs the NAT rules.
 // TunnelIPv4 is the node's address inside the tunnel: OpenVPN's server
 // directive gives the server the first host of the network.
 func (s *OpenVPN) TunnelIPv4() net.IP {
@@ -181,19 +181,31 @@ func (s *OpenVPN) TunnelIPv4() net.IP {
 	return net.IPv4(ip[0], ip[1], ip[2], ip[3]+1)
 }
 
+// Start installs the egress firewall, launches the server, attaches to its
+// management interface (nothing is admitted until the node is attached) and
+// installs the NAT rules.
 func (s *OpenVPN) Start() (err error) {
 	if err = ensureForwarding(); err != nil {
 		return err
 	}
 
+	if err = s.egress.Up(); err != nil {
+		s.egress.Down()
+
+		return err
+	}
+
 	s.process, err = common.StartProcess(binaryName, []string{"--config", s.configPath}, nil)
 	if err != nil {
+		s.egress.Down()
+
 		return err
 	}
 
 	conn, err := dialManagement(s.config.Management.Port, managementTimeout)
 	if err != nil {
 		_ = s.process.Stop(stopTimeout)
+		s.egress.Down()
 
 		return err
 	}
@@ -203,6 +215,7 @@ func (s *OpenVPN) Start() (err error) {
 		_ = s.mgmt.Close()
 		_ = s.process.Stop(stopTimeout)
 		s.nat.Down()
+		s.egress.Down()
 
 		return err
 	}
@@ -211,7 +224,7 @@ func (s *OpenVPN) Start() (err error) {
 }
 
 // Stop detaches from the management interface, ends the server and removes
-// the NAT rules.
+// the NAT rules and the egress firewall.
 func (s *OpenVPN) Stop() error {
 	if s.process == nil {
 		return errors.New("openvpn was not started")
@@ -223,6 +236,7 @@ func (s *OpenVPN) Stop() error {
 	}
 	err := s.process.Stop(stopTimeout)
 	s.nat.Down()
+	s.egress.Down()
 
 	return err
 }

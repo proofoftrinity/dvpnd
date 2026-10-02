@@ -1,0 +1,143 @@
+// SPDX-License-Identifier: Apache-2.0
+
+package wireguard
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/trinitystake/dvpnd/v9/services/common"
+	wgtypes "github.com/trinitystake/dvpnd/v9/services/wireguard/types"
+)
+
+// startRig builds a service whose wg-quick is a script that logs its calls
+// (and fails when told to), records the firewall commands in the same log,
+// and leaves the kernel's forwarding switches alone.
+func startRig(t *testing.T, iface string, quickFails bool) (*WireGuard, func() []string) {
+	t.Helper()
+
+	dir := t.TempDir()
+	log := filepath.Join(dir, "calls.log")
+	exit := "0"
+	if quickFails {
+		exit = "1"
+	}
+	quick := filepath.Join(dir, "wg-quick")
+	script := "#!/bin/sh\necho \"wg-quick $*\" >> " + log + "\nexit " + exit + "\n"
+	if err := os.WriteFile(quick, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	saved, savedQuiet := common.RunCommand, common.RunQuiet
+	common.RunCommand = func(name string, args ...string) error {
+		f, err := os.OpenFile(log, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		_, _ = f.WriteString(name + " " + strings.Join(args, " ") + "\n")
+		if args[0] == "-C" { // no jump in place yet
+			return os.ErrNotExist
+		}
+		return nil
+	}
+	common.RunQuiet = common.RunCommand
+	t.Cleanup(func() { common.RunCommand, common.RunQuiet = saved, savedQuiet })
+
+	savedSwitches := forwardingSwitches
+	forwardingSwitches = nil
+	t.Cleanup(func() { forwardingSwitches = savedSwitches })
+
+	cfg := wgtypes.NewConfig().WithDefaultValues()
+	cfg.Interface = iface
+	cfg.ListenPort = 51820
+	cfg.Uplink = "eth0"
+	key, err := wgtypes.NewPrivateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.PrivateKey = key.String()
+
+	v4, _ := wgtypes.NewIPv4PoolFromCIDR("10.8.0.2/24")
+	v6, _ := wgtypes.NewIPv6PoolFromCIDR("fd86:ea04:1115::2/120")
+	variant := Default
+	variant.Quick = quick
+	variant.ConfigDir = dir
+	s := NewVariant(variant, wgtypes.NewIPPool(v4, v6)).WithConfig(cfg, nil)
+	if err := s.Init(dir); err != nil {
+		t.Fatal(err)
+	}
+
+	return s, func() []string {
+		raw, _ := os.ReadFile(log)
+		return strings.Split(strings.TrimSpace(string(raw)), "\n")
+	}
+}
+
+func index(t *testing.T, calls []string, call string) int {
+	t.Helper()
+
+	for i, c := range calls {
+		if c == call {
+			return i
+		}
+	}
+	t.Fatalf("no call %q in:\n%s", call, strings.Join(calls, "\n"))
+
+	return -1
+}
+
+// TestStartFiltersBeforeTheInterfaceComesUp: the egress chains are filled
+// and jumped to before wg-quick brings the interface up, and taken away only
+// after it is down, so no peer packet passes unfiltered.
+func TestStartFiltersBeforeTheInterfaceComesUp(t *testing.T) {
+	s, calls := startRig(t, "wgtest0", false)
+
+	if err := s.Start(); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Stop(); err != nil {
+		t.Fatal(err)
+	}
+
+	got := calls()
+	up := index(t, got, "wg-quick up wgtest0")
+	down := index(t, got, "wg-quick down wgtest0")
+	tools := []string{"iptables"}
+	if _, err := os.Stat("/proc/sys/net/ipv6"); err == nil {
+		tools = append(tools, "ip6tables")
+	}
+	for _, tool := range tools {
+		if i := index(t, got, tool+" -A DVPND-FWD-wgtest0 -d "+map[string]string{
+			"iptables": "169.254.0.0/16", "ip6tables": "fe80::/10"}[tool]+" -j DROP"); i > up {
+			t.Errorf("%s: the forward chain is filled after the interface is up", tool)
+		}
+		if i := index(t, got, tool+" -I FORWARD 1 -i wgtest0 -j DVPND-FWD-wgtest0"); i > up {
+			t.Errorf("%s: FORWARD jumps to the chain only after the interface is up", tool)
+		}
+		if i := index(t, got, tool+" -I INPUT 1 -i wgtest0 -j DVPND-IN-wgtest0"); i > up {
+			t.Errorf("%s: INPUT jumps to the chain only after the interface is up", tool)
+		}
+		if i := index(t, got, tool+" -D FORWARD -i wgtest0 -j DVPND-FWD-wgtest0"); i < down {
+			t.Errorf("%s: the jump is removed while the interface is still up", tool)
+		}
+		index(t, got, tool+" -X DVPND-IN-wgtest0")
+	}
+}
+
+// TestFailedStartRemovesTheFirewall: when the interface cannot come up the
+// chains do not outlive the attempt.
+func TestFailedStartRemovesTheFirewall(t *testing.T) {
+	s, calls := startRig(t, "wgtest1", true)
+
+	if err := s.Start(); err == nil {
+		t.Fatal("Start succeeded although wg-quick failed")
+	}
+
+	got := calls()
+	if i := index(t, got, "iptables -X DVPND-FWD-wgtest1"); i < index(t, got, "wg-quick up wgtest1") {
+		t.Fatal("chains removed before the attempt")
+	}
+}

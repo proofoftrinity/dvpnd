@@ -18,6 +18,7 @@ import (
 
 	"github.com/spf13/viper"
 
+	"github.com/trinitystake/dvpnd/v9/services/common"
 	wgtypes "github.com/trinitystake/dvpnd/v9/services/wireguard/types"
 	"github.com/trinitystake/dvpnd/v9/types"
 )
@@ -247,15 +248,33 @@ func EnsureForwarding() error {
 	return nil
 }
 
-// Start brings the interface up. An earlier instance that died without Stop
-// leaves the interface behind and wg-quick refuses to create it again; in that
-// case it is torn down and recreated so a restart needs no manual cleanup.
-func (s *WireGuard) Start() error {
-	if err := EnsureForwarding(); err != nil {
+// egress is the firewall that keeps the interface's peers off the host and
+// the networks around it.
+func (s *WireGuard) egress() common.TunnelEgress {
+	return common.TunnelEgress{Interface: s.config.Interface}
+}
+
+// Start installs the egress firewall, then brings the interface up, so no
+// peer packet is forwarded unfiltered. An earlier instance that died without
+// Stop leaves the interface behind and wg-quick refuses to create it again;
+// in that case it is torn down and recreated so a restart needs no manual
+// cleanup.
+func (s *WireGuard) Start() (err error) {
+	if err = EnsureForwarding(); err != nil {
 		return err
 	}
 
-	err := s.wgQuick("up")
+	if err = s.egress().Up(); err != nil {
+		s.egress().Down()
+		return err
+	}
+	defer func() {
+		if err != nil {
+			s.egress().Down()
+		}
+	}()
+
+	err = s.wgQuick("up")
 	if err == nil {
 		return nil
 	}
@@ -270,8 +289,12 @@ func (s *WireGuard) Start() error {
 	return s.wgQuick("up")
 }
 
+// Stop takes the interface down, then removes the egress firewall.
 func (s *WireGuard) Stop() error {
-	return s.wgQuick("down")
+	err := s.wgQuick("down")
+	s.egress().Down()
+
+	return err
 }
 
 func (s *WireGuard) AddPeer(data []byte) (result []byte, err error) {

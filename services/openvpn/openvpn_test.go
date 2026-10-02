@@ -229,12 +229,16 @@ func TestStartStop(t *testing.T) {
 	dir, cfg := home(t, ovpntypes.ProtoUDP, false)
 
 	var rules []string
-	saved := common.RunCommand
+	saved, savedQuiet := common.RunCommand, common.RunQuiet
 	common.RunCommand = func(name string, args ...string) error {
 		rules = append(rules, name+" "+strings.Join(args, " "))
+		if args[0] == "-C" { // no jump in place yet
+			return os.ErrNotExist
+		}
 		return nil
 	}
-	t.Cleanup(func() { common.RunCommand = saved })
+	common.RunQuiet = common.RunCommand
+	t.Cleanup(func() { common.RunCommand, common.RunQuiet = saved, savedQuiet })
 
 	savedFwd := ensureForwarding
 	ensureForwarding = func() error { return nil }
@@ -261,12 +265,29 @@ func TestStartStop(t *testing.T) {
 		!strings.Contains(joined, "ip6tables -A FORWARD -o ovpn0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT") {
 		t.Fatalf("rules:\n%s", joined)
 	}
+	// The egress chains go in first and are jumped to ahead of the accept rules.
+	for _, rule := range []string{
+		"iptables -A DVPND-FWD-ovpn0 -d 10.0.0.0/8 -j DROP",
+		"iptables -A DVPND-FWD-ovpn0 -p tcp --dport 25 -j DROP",
+		"iptables -I FORWARD 1 -i ovpn0 -j DVPND-FWD-ovpn0",
+		"iptables -I INPUT 1 -i ovpn0 -j DVPND-IN-ovpn0",
+	} {
+		if !strings.Contains(joined, rule) {
+			t.Fatalf("rules lack %q:\n%s", rule, joined)
+		}
+	}
+	if strings.Index(joined, "DVPND-FWD-ovpn0") > strings.Index(joined, "-A FORWARD -i ovpn0 -j ACCEPT") {
+		t.Fatalf("egress chains installed after the accept rules:\n%s", joined)
+	}
 
 	if err := s.Stop(); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(strings.Join(rules, "\n"), "iptables -D FORWARD -i ovpn0 -j ACCEPT") {
-		t.Fatal("rules not removed")
+	joined = strings.Join(rules, "\n")
+	if !strings.Contains(joined, "iptables -D FORWARD -i ovpn0 -j ACCEPT") ||
+		!strings.Contains(joined, "iptables -D FORWARD -i ovpn0 -j DVPND-FWD-ovpn0") ||
+		!strings.Contains(joined, "iptables -X DVPND-IN-ovpn0") {
+		t.Fatalf("rules not removed:\n%s", joined)
 	}
 	if exited, _ := s.process.Exited(); !exited {
 		t.Fatal("child not reaped")
