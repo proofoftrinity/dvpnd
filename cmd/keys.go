@@ -143,9 +143,15 @@ func keysAdd() *cobra.Command {
 				return err
 			}
 
-			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "**Important** write this mnemonic phrase in a safe place\n")
-			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "%s\n", mnemonic)
-			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "\n")
+			// A new key's mnemonic is shown once, as its only backup. A
+			// recovered key's mnemonic is the one just typed: printing it
+			// again would only leave it in the terminal's scrollback or in a
+			// log of the session.
+			if !recoverKey {
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "**Important** write this mnemonic phrase in a safe place\n")
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "%s\n", mnemonic)
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "\n")
+			}
 
 			return utils.WriteKeys(cmd.OutOrStdout(), key)
 		},
