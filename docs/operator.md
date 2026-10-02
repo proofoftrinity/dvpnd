@@ -469,6 +469,10 @@ real traffic this way and reported it on chain.
   rows and is compacted at every start. journald keeps old lines until its size cap; to keep
   less, set `MaxRetentionSec=7day` in `/etc/systemd/journald.conf` and
   `sudo systemctl restart systemd-journald` (Docker: the 3×50MB cap in §7 already applies).
+- **Handshakes** are accepted over HTTPS only (plain HTTP gets 403; the status pages answer
+  either way) and at most 30 a minute from one address (one IPv6 /64); the excess gets 429
+  with `Retry-After`. Refused excess attempts are logged at debug only, with one line a minute
+  saying limiting is active.
 - **Advertised bandwidth:** `curl -sk https://127.0.0.1:8585/status | jq .result.bandwidth`
   shows the figure and its `source`. `speedtest` is a measurement; the log has one
   `Speed test result` line per server used, and a `rejected: too close to be off this host's

@@ -64,7 +64,9 @@ func logRefusals(ctx *context.Context) gin.HandlerFunc {
 			"client", c.RemoteIP(),
 			"agent", c.Request.UserAgent(),
 		)
-		if status < http.StatusBadRequest {
+		// A rate-limited attempt is left at debug: a flood would otherwise
+		// fill the log (the limiter logs once per window that it is refusing).
+		if status < http.StatusBadRequest || status == http.StatusTooManyRequests {
 			return
 		}
 

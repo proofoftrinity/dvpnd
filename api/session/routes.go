@@ -10,8 +10,12 @@ import (
 )
 
 func RegisterRoutes(ctx *context.Context, router gin.IRouter) {
+	// Both handshake routes share one attempt limit, checked after the TLS
+	// requirement so a refused plain-HTTP request does not use it up.
+	limit := limitHandshakes(ctx, newRateLimiter(handshakeLimit, handshakeWindow))
+
 	// Current client apps handshake at the root path.
-	router.POST("/", HandlerHandshake(ctx))
+	router.POST("/", requireTLS(), limit, HandlerHandshake(ctx))
 	// Legacy endpoint kept for older clients.
-	router.POST("/accounts/:acc_address/sessions/:id", HandlerAddSession(ctx))
+	router.POST("/accounts/:acc_address/sessions/:id", requireTLS(), limit, HandlerAddSession(ctx))
 }
