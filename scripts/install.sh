@@ -25,6 +25,11 @@ set -Eeuo pipefail
 REPO_URL="https://github.com/trinitystake/dvpnd.git"
 REPO_API="https://api.github.com/repos/trinitystake/dvpnd/releases/latest"
 
+# Release tags are signed with the maintainer's SSH key; the installer builds
+# a tag only when its signature checks out against this key. It is the same
+# key GitHub shows as verified on the tags.
+TAG_SIGNER="114076168+trinitystake@users.noreply.github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFqdfC3zNhLfD0Hl5H2bvlCvtBtOBhz0VSiietVWvMch"
+
 # Pinned protocol binaries: the versions the client apps are tested against and
 # the ones the Docker image builds (see Dockerfile).
 XRAY_VERSION="v26.3.27"
@@ -175,7 +180,7 @@ random_port() { shuf -i 10000-60000 -n 1; }
 log "Installing packages"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y -qq ca-certificates curl git build-essential jq openssl iproute2 iputils-ping iptables >/dev/null
+apt-get install -y -qq ca-certificates curl git build-essential jq openssl openssh-client iproute2 iputils-ping iptables >/dev/null
 case "${NODE_TYPE}" in
   wireguard) apt-get install -y -qq wireguard-tools >/dev/null ;;
   openvpn) apt-get install -y -qq openvpn >/dev/null ;;
@@ -183,6 +188,25 @@ case "${NODE_TYPE}" in
 esac
 
 # ---------------------------------------------------------------- source
+
+# verify_tag checks the tag's SSH signature against TAG_SIGNER with ssh-keygen
+# directly, since git learned SSH signatures only in 2.34.
+verify_tag() {
+  local dir="$1" tag="$2" tmp rc
+  tmp=$(mktemp -d)
+  printf '%s\n' "${TAG_SIGNER}" >"${tmp}/allowed_signers"
+  if ! git -C "${dir}" cat-file tag "${tag}" >"${tmp}/tag" 2>/dev/null; then
+    rm -rf "${tmp}"
+    return 1
+  fi
+  sed -n '/^-----BEGIN SSH SIGNATURE-----$/,$p' "${tmp}/tag" >"${tmp}/sig"
+  sed '/^-----BEGIN SSH SIGNATURE-----$/,$d' "${tmp}/tag" >"${tmp}/payload"
+  ssh-keygen -Y verify -f "${tmp}/allowed_signers" -I "${TAG_SIGNER%% *}" -n git \
+    -s "${tmp}/sig" <"${tmp}/payload" >/dev/null 2>&1
+  rc=$?
+  rm -rf "${tmp}"
+  return "${rc}"
+}
 
 if [[ -n "${SOURCE_DIR}" ]]; then
   [[ -f "${SOURCE_DIR}/go.mod" && -f "${SOURCE_DIR}/main.go" ]] || die "--source ${SOURCE_DIR} is not a dvpnd source tree"
@@ -201,7 +225,9 @@ else
     rm -rf "${SRC}"
     git clone --quiet "${REPO_URL}" "${SRC}"
   fi
-  git -C "${SRC}" checkout --quiet "${VERSION}"
+  verify_tag "${SRC}" "${VERSION}" ||
+    die "${VERSION} is not a release tag signed by the maintainer; refusing to build it (build a tree you checked yourself with --source)"
+  git -C "${SRC}" checkout --quiet "refs/tags/${VERSION}"
 fi
 
 # ---------------------------------------------------------------- Go

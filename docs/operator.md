@@ -45,8 +45,10 @@ sudo bash install.sh --moniker "My node"          # --type amneziawg|openvpn|v2r
 
 With `--granter sent1…` it creates a hot key instead of the operator key and prints the
 grants to make from the node account's wallet (§3a); on an existing node that is the move to
-a hot key. It keeps an existing configuration, key and certificate unless given `--force`, so
-re-running it is the upgrade path. On a machine behind a router it prints the ports to
+a hot key. It builds only a release tag whose SSH signature checks out against the maintainer's key
+pinned in the script (the key GitHub shows as verified on the tags); to build anything else,
+check the tree yourself and pass `--source`. It keeps an existing configuration, key and
+certificate unless given `--force`, so re-running it is the upgrade path. On a machine behind a router it prints the ports to
 forward. The sections below are what it does, for doing it by hand or understanding the
 result.
 
