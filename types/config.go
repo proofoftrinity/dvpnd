@@ -9,9 +9,7 @@ import (
 	"math"
 	"net"
 	"net/url"
-	"os"
 	"strings"
-	"text/template"
 	"time"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
@@ -65,13 +63,13 @@ gas = {{ .Chain.Gas }}
 gas_adjustment = {{ .Chain.GasAdjustment }}
 
 # Gas prices to determine the transaction fee
-gas_prices = "{{ .Chain.GasPrices }}"
+gas_prices = {{ toml .Chain.GasPrices }}
 
 # The network chain ID
-id = "{{ .Chain.ID }}"
+id = {{ toml .Chain.ID }}
 
 # Comma separated Tendermint RPC addresses for the chain
-rpc_addresses = "{{ .Chain.RPCAddresses }}"
+rpc_addresses = {{ toml .Chain.RPCAddresses }}
 
 # Timeout seconds for querying the data from the RPC server
 rpc_query_timeout = {{ .Chain.RPCQueryTimeout }}
@@ -105,19 +103,19 @@ allow_smtp = {{ .Egress.AllowSMTP }}
 #   ipinfo      - IP, country (free Lite plan, token required); city and coordinates need a
 #                 paid plan (set url to its endpoint).
 #   none        - no lookup; node.ipv4_address is used as the public IP.
-provider = "{{ .GeoIP.Provider }}"
+provider = {{ toml .GeoIP.Provider }}
 
 # Optional endpoint override; only for a single provider, never with auto or none
-url = "{{ .GeoIP.URL }}"
+url = {{ toml .GeoIP.URL }}
 
 # API token: required for ipinfo, optional for ip2location, not accepted otherwise
-token = "{{ .GeoIP.Token }}"
+token = {{ toml .GeoIP.Token }}
 
 # Static location; when set, these override what the provider returns.
 # Clients use the reported location to choose a node and nothing verifies it:
 # enter the server's real physical location, never an invented one.
-city = "{{ .GeoIP.City }}"
-country = "{{ .GeoIP.Country }}"
+city = {{ toml .GeoIP.City }}
+country = {{ toml .GeoIP.Country }}
 latitude = {{ printf "%.6f" .GeoIP.Latitude }}
 longitude = {{ printf "%.6f" .GeoIP.Longitude }}
 
@@ -130,57 +128,50 @@ peers = {{ .Handshake.Peers }}
 
 [keyring]
 # Underlying storage mechanism for keys
-backend = "{{ .Keyring.Backend }}"
+backend = {{ toml .Keyring.Backend }}
 
 # Name of the key with which to sign
-from = "{{ .Keyring.From }}"
+from = {{ toml .Keyring.From }}
 
 [node]
 # Time interval between each set_sessions operation
-interval_set_sessions = "{{ .Node.IntervalSetSessions }}"
+interval_set_sessions = {{ toml .Node.IntervalSetSessions }}
 
 # Time interval between each update_sessions transaction
-interval_update_sessions = "{{ .Node.IntervalUpdateSessions }}"
+interval_update_sessions = {{ toml .Node.IntervalUpdateSessions }}
 
 # Time interval between each set_status transaction
-interval_update_status = "{{ .Node.IntervalUpdateStatus }}"
+interval_update_status = {{ toml .Node.IntervalUpdateStatus }}
 
 # IPv4 address to replace the public IPv4 address with
-ipv4_address = "{{ .Node.IPv4Address }}"
+ipv4_address = {{ toml .Node.IPv4Address }}
 
 # API listen-address
-listen_on = "{{ .Node.ListenOn }}"
+listen_on = {{ toml .Node.ListenOn }}
 
 # Name of the node
-moniker = "{{ .Node.Moniker }}"
+moniker = {{ toml .Node.Moniker }}
 
 # Prices for one gigabyte of bandwidth provided. Either plain coins ("1000udvpn,5uatom")
 # or the chain's price form "denom:base_value,quote_value" separated by ";"
 # (a non-zero base_value lets the chain re-quote the price via its oracle)
-gigabyte_prices = "{{ .Node.GigabytePrices }}"
+gigabyte_prices = {{ toml .Node.GigabytePrices }}
 
 # Prices for one hour, same format
-hourly_prices = "{{ .Node.HourlyPrices }}"
+hourly_prices = {{ toml .Node.HourlyPrices }}
 
 # Public URL of the node (https://host:port); the chain records the host:port part
-remote_url = "{{ .Node.RemoteURL }}"
+remote_url = {{ toml .Node.RemoteURL }}
 
 # Type of node
-type = "{{ .Node.Type }}"
+type = {{ toml .Node.Type }}
 
 [qos]
 # Limit max number of concurrent peers
 max_peers = {{ .QOS.MaxPeers }}
 	`)
 
-	t = func() *template.Template {
-		t, err := template.New("config_toml").Parse(ct)
-		if err != nil {
-			panic(err)
-		}
-
-		return t
-	}()
+	t = utils.ConfigTemplate("config_toml", ct)
 )
 
 // BandwidthConfig is the operator's declared link. Both zero (the default)
@@ -637,7 +628,7 @@ func (c *Config) SaveToPath(path string) error {
 		return err
 	}
 
-	return os.WriteFile(path, buffer.Bytes(), 0644)
+	return utils.WritePrivateFile(path, buffer.Bytes())
 }
 
 func (c *Config) String() string {

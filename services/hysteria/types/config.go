@@ -4,10 +4,8 @@ package types
 
 import (
 	"bytes"
-	"os"
 	"regexp"
 	"strings"
-	"text/template"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
@@ -22,11 +20,11 @@ var (
 listen_port = {{ .Server.ListenPort }}
 
 # Salamander obfuscation password handed to clients; empty disables obfuscation
-obfs_password = "{{ .Server.ObfsPassword }}"
+obfs_password = {{ toml .Server.ObfsPassword }}
 
 # Bandwidth offered to each client, e.g. "100 mbps"; empty lets the client choose
-up = "{{ .Server.Up }}"
-down = "{{ .Server.Down }}"
+up = {{ toml .Server.Up }}
+down = {{ toml .Server.Down }}
 
 [api]
 # Loopback ports: hysteria calls auth_port to authenticate a client, and answers
@@ -35,14 +33,7 @@ auth_port = {{ .API.AuthPort }}
 stats_port = {{ .API.StatsPort }}
 	`)
 
-	t = func() *template.Template {
-		t, err := template.New("hysteria_toml").Parse(ct)
-		if err != nil {
-			panic(err)
-		}
-
-		return t
-	}()
+	t = utils.ConfigTemplate("hysteria_toml", ct)
 
 	// bandwidth is what hysteria accepts: a number with an optional unit.
 	bandwidth = regexp.MustCompile(`^[0-9]+(\.[0-9]+)?\s*(bps|kbps|mbps|gbps|tbps)?$`)
@@ -127,7 +118,7 @@ func (c *Config) SaveToPath(path string) error {
 		return err
 	}
 
-	return os.WriteFile(path, buf.Bytes(), 0644)
+	return utils.WritePrivateFile(path, buf.Bytes())
 }
 
 func (c *Config) String() string {

@@ -6,9 +6,7 @@ package types
 import (
 	"bytes"
 	"fmt"
-	"os"
 	"strings"
-	"text/template"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
@@ -26,21 +24,14 @@ listen_port = {{ .VMess.ListenPort }}
 tls = {{ .VMess.TLS }}
 
 # Transport protocol for the VMess inbound (tcp is the only one confirmed with current client apps)
-transport = "{{ .VMess.Transport }}"
+transport = {{ toml .VMess.Transport }}
 
 [api]
 # Loopback port on which the node drives v2ray; nothing else may bind it
 port = {{ .API.Port }}
 	`)
 
-	t = func() *template.Template {
-		t, err := template.New("v2ray_toml").Parse(ct)
-		if err != nil {
-			panic(err)
-		}
-
-		return t
-	}()
+	t = utils.ConfigTemplate("v2ray_toml", ct)
 )
 
 type VMessConfig struct {
@@ -145,7 +136,7 @@ func (c *Config) SaveToPath(path string) error {
 		return err
 	}
 
-	return os.WriteFile(path, buf.Bytes(), 0644)
+	return utils.WritePrivateFile(path, buf.Bytes())
 }
 
 func (c *Config) String() string {

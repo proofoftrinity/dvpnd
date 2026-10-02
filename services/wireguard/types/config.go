@@ -5,9 +5,7 @@ package types
 
 import (
 	"bytes"
-	"os"
 	"strings"
-	"text/template"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
@@ -18,17 +16,17 @@ import (
 var (
 	ct = strings.TrimSpace(`
 # Name of the network interface
-interface = "{{ .Interface }}"
+interface = {{ toml .Interface }}
 
 # Port number to accept the incoming connections
 listen_port = {{ .ListenPort }}
 
 # Server private key
-private_key = "{{ .PrivateKey }}"
+private_key = {{ toml .PrivateKey }}
 
 # Network interface that carries the node's internet traffic; peers are NAT-ed
 # through it. Empty means detect it from the default route at start
-uplink = "{{ .Uplink }}"
+uplink = {{ toml .Uplink }}
 
 # Hand each peer an IPv6 tunnel address next to the IPv4 one (true, as every
 # other node on the network does). It needs a host that can reach the IPv6
@@ -38,14 +36,7 @@ uplink = "{{ .Uplink }}"
 enable_ipv6 = {{ .EnableIPv6 }}
 	`)
 
-	t = func() *template.Template {
-		t, err := template.New("wireguard_toml").Parse(ct)
-		if err != nil {
-			panic(err)
-		}
-
-		return t
-	}()
+	t = utils.ConfigTemplate("wireguard_toml", ct)
 )
 
 type Config struct {
@@ -97,7 +88,7 @@ func (c *Config) SaveToPath(path string) error {
 		return err
 	}
 
-	return os.WriteFile(path, buffer.Bytes(), 0644)
+	return utils.WritePrivateFile(path, buffer.Bytes())
 }
 
 func (c *Config) String() string {

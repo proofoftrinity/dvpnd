@@ -4,9 +4,7 @@ package types
 
 import (
 	"bytes"
-	"os"
 	"strings"
-	"text/template"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
@@ -17,17 +15,17 @@ import (
 var (
 	ct = strings.TrimSpace(`
 # Name of the tunnel interface
-interface = "{{ .Interface }}"
+interface = {{ toml .Interface }}
 
 # Port number to accept the incoming connections
 listen_port = {{ .ListenPort }}
 
 # Transport: "udp" (recommended) or "tcp"
-proto = "{{ .Proto }}"
+proto = {{ toml .Proto }}
 
 # Network interface that carries the node's internet traffic; peers are NAT-ed
 # through it. Empty means detect it from the default route at start
-uplink = "{{ .Uplink }}"
+uplink = {{ toml .Uplink }}
 
 # Hand each peer an IPv6 tunnel address next to the IPv4 one; the host must
 # then reach the IPv6 internet. Set it false for an IPv4-only tunnel
@@ -39,14 +37,7 @@ enable_ipv6 = {{ .EnableIPv6 }}
 port = {{ .Management.Port }}
 	`)
 
-	t = func() *template.Template {
-		t, err := template.New("openvpn_toml").Parse(ct)
-		if err != nil {
-			panic(err)
-		}
-
-		return t
-	}()
+	t = utils.ConfigTemplate("openvpn_toml", ct)
 )
 
 type ManagementConfig struct {
@@ -108,7 +99,7 @@ func (c *Config) SaveToPath(path string) error {
 		return err
 	}
 
-	return os.WriteFile(path, buf.Bytes(), 0644)
+	return utils.WritePrivateFile(path, buf.Bytes())
 }
 
 func (c *Config) String() string {
