@@ -113,13 +113,21 @@ func (s *V2Ray) Init(home string) (err error) {
 		}
 	}
 
-	t, err := template.New("v2ray_json").Parse(configTemplate)
+	t, err := template.New("v2ray_json").Funcs(template.FuncMap{"json": common.JSON}).Parse(configTemplate)
 	if err != nil {
 		return err
 	}
 
+	data := templateData{
+		Config:          s.config,
+		BlockedNetworks: common.BlockedNetworks(),
+		BlockedDomain:   common.BlockedLocalDomain,
+		SMTPPort:        common.SMTPPort,
+		AllowSMTP:       common.EgressPolicy().AllowSMTP,
+	}
+
 	var buf bytes.Buffer
-	if err = t.Execute(&buf, s.config); err != nil {
+	if err = t.Execute(&buf, data); err != nil {
 		return err
 	}
 	if err = os.WriteFile(s.configFilePath(), buf.Bytes(), 0600); err != nil {
@@ -148,7 +156,7 @@ func (s *V2Ray) Stop() error {
 }
 
 func (s *V2Ray) clientConn() (*grpc.ClientConn, error) {
-	target := "127.0.0.1:23"
+	target := fmt.Sprintf("127.0.0.1:%d", s.config.API.Port)
 	return grpc.Dial(
 		target,
 		grpc.WithBlock(),

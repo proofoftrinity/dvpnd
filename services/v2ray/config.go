@@ -1,11 +1,20 @@
 // SPDX-License-Identifier: Apache-2.0
+// Modified from sentinel-official/dvpn-node @ 62bde16 (2024-01-25). See NOTICE.
 
 package v2ray
 
 import (
 	"strings"
+
+	v2raytypes "github.com/trinitystake/dvpnd/v9/services/v2ray/types"
 )
 
+// configTemplate is the v2ray server configuration the node writes at start.
+// The control API listens on a loopback port of the node's choosing. The
+// node's egress policy is routed to a blackhole: the blocked networks,
+// localhost by name, and TCP port 25 unless allowed. IPIfNonMatch resolves a
+// destination given as a name and matches its addresses too, so a name that
+// points at loopback cannot reach the control API.
 var (
 	configTemplate = strings.TrimSpace(`
 {
@@ -19,7 +28,7 @@ var (
     "inbounds": [
         {
             "listen": "127.0.0.1",
-            "port": 23,
+            "port": {{ .API.Port }},
             "protocol": "dokodemo-door",
             "settings": {
                 "address": "127.0.0.1"
@@ -52,7 +61,12 @@ var (
     },
     "outbounds": [
         {
-            "protocol": "freedom"
+            "protocol": "freedom",
+            "tag": "direct"
+        },
+        {
+            "protocol": "blackhole",
+            "tag": "blocked"
         }
     ],
     "policy": {
@@ -64,12 +78,33 @@ var (
         }
     },
     "routing": {
+        "domainStrategy": "IPIfNonMatch",
         "rules": [
             {
                 "inboundTag": [
                     "api"
                 ],
                 "outboundTag": "api",
+                "type": "field"
+            },
+            {
+                "domain": [
+                    "domain:{{ .BlockedDomain }}"
+                ],
+                "outboundTag": "blocked",
+                "type": "field"
+            },
+{{- if not .AllowSMTP }}
+            {
+                "network": "tcp",
+                "outboundTag": "blocked",
+                "port": "{{ .SMTPPort }}",
+                "type": "field"
+            },
+{{- end }}
+            {
+                "ip": {{ json .BlockedNetworks }},
+                "outboundTag": "blocked",
                 "type": "field"
             }
         ]
@@ -90,3 +125,14 @@ var (
 }
 	`)
 )
+
+// templateData is the configuration plus the egress policy (see
+// common.Egress).
+type templateData struct {
+	*v2raytypes.Config
+
+	BlockedNetworks []string
+	BlockedDomain   string
+	SMTPPort        int
+	AllowSMTP       bool
+}

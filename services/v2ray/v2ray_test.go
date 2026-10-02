@@ -3,11 +3,17 @@
 package v2ray
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/spf13/viper"
+
+	"github.com/trinitystake/dvpnd/v9/services/common"
+	v2raytypes "github.com/trinitystake/dvpnd/v9/services/v2ray/types"
 )
 
 // stub writes an executable script named v2ray into a temp dir and points
@@ -98,5 +104,115 @@ func TestStopKillsChildThatIgnoresTerm(t *testing.T) {
 func TestStopWithoutStart(t *testing.T) {
 	if err := NewV2Ray().Stop(); err == nil {
 		t.Fatal("Stop before Start must fail")
+	}
+}
+
+// TestInitRendersEgressPolicy: a client cannot reach the blocked networks,
+// loopback by name (the control API first of all), or port 25 unless the
+// operator allows it; the control API is on the configured port.
+func TestInitRendersEgressPolicy(t *testing.T) {
+	stub(t, "trap 'exit 0' TERM")
+	t.Cleanup(func() { common.SetEgress(common.Egress{}) })
+
+	dir := t.TempDir()
+	t.Setenv("TMPDIR", dir)
+	cfg := v2raytypes.NewConfig().WithDefaultValues()
+	cfg.VMess.ListenPort = 8443
+	cfg.API.Port = 23456
+	if err := cfg.SaveToPath(filepath.Join(dir, v2raytypes.ConfigFileName)); err != nil {
+		t.Fatal(err)
+	}
+
+	render := func() map[string]interface{} {
+		t.Helper()
+
+		s := NewV2Ray()
+		if err := s.Init(dir); err != nil {
+			t.Fatal(err)
+		}
+		raw, err := os.ReadFile(filepath.Join(dir, "v2ray_config.json"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var doc map[string]interface{}
+		if err := json.Unmarshal(raw, &doc); err != nil {
+			t.Fatalf("rendered config is not JSON: %v\n%s", err, raw)
+		}
+		return doc
+	}
+
+	doc := render()
+	api := doc["inbounds"].([]interface{})[0].(map[string]interface{})
+	if api["tag"] != "api" || api["listen"] != "127.0.0.1" || api["port"].(float64) != 23456 {
+		t.Fatalf("api inbound: %v", api)
+	}
+	outbounds := doc["outbounds"].([]interface{})
+	if outbounds[0].(map[string]interface{})["protocol"] != "freedom" ||
+		outbounds[1].(map[string]interface{})["protocol"] != "blackhole" ||
+		outbounds[1].(map[string]interface{})["tag"] != "blocked" {
+		t.Fatalf("outbounds: %v", outbounds)
+	}
+
+	routing := doc["routing"].(map[string]interface{})
+	if routing["domainStrategy"] != "IPIfNonMatch" {
+		t.Fatalf("domainStrategy %v: a name that resolves to loopback would pass", routing["domainStrategy"])
+	}
+	rules := routing["rules"].([]interface{})
+	if len(rules) != 4 {
+		t.Fatalf("rules: %v", rules)
+	}
+	for _, r := range rules[1:] {
+		if r.(map[string]interface{})["outboundTag"] != "blocked" {
+			t.Fatalf("rule %v does not block", r)
+		}
+	}
+	if d := rules[1].(map[string]interface{})["domain"].([]interface{}); len(d) != 1 || d[0] != "domain:localhost" {
+		t.Fatalf("domain rule: %v", d)
+	}
+	if p := rules[2].(map[string]interface{}); p["port"] != "25" || p["network"] != "tcp" {
+		t.Fatalf("port 25 rule: %v", p)
+	}
+	var ips []string
+	for _, ip := range rules[3].(map[string]interface{})["ip"].([]interface{}) {
+		ips = append(ips, ip.(string))
+	}
+	if strings.Join(ips, " ") != strings.Join(common.BlockedNetworks(), " ") {
+		t.Fatalf("blocked networks: %v", ips)
+	}
+
+	common.SetEgress(common.Egress{AllowSMTP: true})
+	if rules = render()["routing"].(map[string]interface{})["rules"].([]interface{}); len(rules) != 3 {
+		t.Fatalf("allow_smtp: rules %v", rules)
+	}
+}
+
+// TestConfigWithoutAPISection: a v2ray.toml written before [api] existed
+// still starts, on a random API port.
+func TestConfigWithoutAPISection(t *testing.T) {
+	path := filepath.Join(t.TempDir(), v2raytypes.ConfigFileName)
+	old := "[vmess]\nlisten_port = 8443\ntls = false\ntransport = \"tcp\"\n"
+	if err := os.WriteFile(path, []byte(old), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	v := viper.New()
+	v.SetConfigFile(path)
+	cfg, err := v2raytypes.ReadInConfig(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if cfg.API.Port == 0 || cfg.VMess.ListenPort != 8443 {
+		t.Fatalf("api port %d, listen port %d", cfg.API.Port, cfg.VMess.ListenPort)
+	}
+	if !strings.Contains(cfg.String(), "[api]\n") {
+		t.Fatalf("the file written back lacks [api]:\n%s", cfg)
+	}
+
+	cfg.API.Port = cfg.VMess.ListenPort
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("the API port may not be the VMess port")
 	}
 }

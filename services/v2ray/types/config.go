@@ -27,6 +27,10 @@ tls = {{ .VMess.TLS }}
 
 # Transport protocol for the VMess inbound (tcp is the only one confirmed with current client apps)
 transport = "{{ .VMess.Transport }}"
+
+[api]
+# Loopback port on which the node drives v2ray; nothing else may bind it
+port = {{ .API.Port }}
 	`)
 
 	t = func() *template.Template {
@@ -77,13 +81,40 @@ func (c *VMessConfig) Validate() error {
 	return nil
 }
 
+// APIConfig is where the node reaches v2ray's control API. A file written
+// before the section existed gets a fresh random port at every start, which
+// works because the node renders v2ray's configuration from the same value.
+type APIConfig struct {
+	Port uint16 `json:"port" mapstructure:"port"`
+}
+
+func NewAPIConfig() *APIConfig {
+	return &APIConfig{}
+}
+
+func (c *APIConfig) WithDefaultValues() *APIConfig {
+	c.Port = utils.RandomPort()
+
+	return c
+}
+
+func (c *APIConfig) Validate() error {
+	if c.Port == 0 {
+		return errors.New("port cannot be zero")
+	}
+
+	return nil
+}
+
 type Config struct {
 	VMess *VMessConfig `json:"vmess" mapstructure:"vmess"`
+	API   *APIConfig   `json:"api" mapstructure:"api"`
 }
 
 func NewConfig() *Config {
 	return &Config{
 		VMess: NewVMessConfig(),
+		API:   NewAPIConfig(),
 	}
 }
 
@@ -91,12 +122,19 @@ func (c *Config) Validate() error {
 	if err := c.VMess.Validate(); err != nil {
 		return errors.Wrapf(err, "invalid section vmess")
 	}
+	if err := c.API.Validate(); err != nil {
+		return errors.Wrapf(err, "invalid section api")
+	}
+	if c.API.Port == c.VMess.ListenPort {
+		return errors.New("api port must differ from the vmess listen_port")
+	}
 
 	return nil
 }
 
 func (c *Config) WithDefaultValues() *Config {
 	c.VMess = c.VMess.WithDefaultValues()
+	c.API = c.API.WithDefaultValues()
 
 	return c
 }
