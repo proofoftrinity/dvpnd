@@ -1,4 +1,6 @@
-FROM golang:1.27-alpine3.23 AS build
+# Base images are pinned by digest (Dependabot moves the pins), so a tag
+# re-pointed upstream cannot change what is built.
+FROM golang:1.27-alpine3.23@sha256:0908ac9b9319e09d7c238aabe914e0395c51d63c4e3d0ae8c554fda9158a5769 AS build
 
 # Proxy binaries the node drives, pinned to the releases the client apps are
 # tested against and checked against the sha256 the project publishes.
@@ -40,7 +42,7 @@ RUN --mount=target=/go/pkg/mod,type=cache \
     make -C /root/amneziawg-tools/src --jobs=$(nproc) && \
     make -C /root/amneziawg-tools/src DESTDIR=/root/awg-install PREFIX=/usr WITH_WGQUICK=yes WITH_BASHCOMPLETION=no WITH_SYSTEMDUNITS=no install
 
-FROM alpine:3.24
+FROM alpine:3.24@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
 
 COPY --from=build /go/bin/dvpnd /usr/local/bin/process
 COPY --from=build /root/hnsd/hnsd /usr/local/bin/hnsd
