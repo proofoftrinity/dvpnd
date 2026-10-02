@@ -42,6 +42,7 @@ func KeysCmd() *cobra.Command {
 		keysShow(),
 		keysList(),
 		keysDelete(),
+		keysAuthzCommands(),
 	)
 
 	return cmd

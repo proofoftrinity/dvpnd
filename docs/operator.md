@@ -43,7 +43,9 @@ curl -fsSL https://raw.githubusercontent.com/trinitystake/dvpnd/main/scripts/ins
 sudo bash install.sh --moniker "My node"          # --type amneziawg|openvpn|v2ray|xray|hysteria2, --help for the rest
 ```
 
-It keeps an existing configuration, key and certificate unless given `--force`, so
+With `--granter sent1…` it creates a hot key instead of the operator key and prints the
+grants to make from the node account's wallet (§3a); on an existing node that is the move to
+a hot key. It keeps an existing configuration, key and certificate unless given `--force`, so
 re-running it is the upgrade path. On a machine behind a router it prints the ports to
 forward. The sections below are what it does, for doing it by hand or understanding the
 result.
@@ -71,7 +73,8 @@ Edit `~/.dvpnd/config.toml`:
 
 | Key | Set to |
 |---|---|
-| `[keyring] backend` | `test` — the node must sign transactions unattended, so the key is stored unencrypted under `~/.dvpnd/keyring-test` (mode 700). Use a **dedicated operator key** and sweep earnings out regularly; see §8. |
+| `[keyring] backend` | `test` — the node must sign transactions unattended, so the key is stored unencrypted under `~/.dvpnd/keyring-test` (mode 700). Prefer a **hot key** (`[keyring] granter`, §3a): the operator key and the earnings then stay off the server. Otherwise use a dedicated operator key and sweep earnings out regularly; see §8. |
+| `[keyring] granter` | empty, or the node account's `sent1…` address when `from` is a hot key (§3a). |
 | `[keyring] from` | the key name you will create in step 3, e.g. `operator` |
 | `[node] type` | `wireguard`, `amneziawg`, `openvpn`, `v2ray`, `xray` or `hysteria2`; see §2a to §2f for the protocol's own file |
 | `[node] moniker` | your node's public name (4–32 characters) |
@@ -216,6 +219,40 @@ dvpnd keys list                        # shows the sent1… operator and sentnod
 
 Send a few DVPN to the `sent1…` address for gas (each status update and usage report is a
 transaction; budget roughly 0.02 DVPN per transaction, a status update every 48 minutes).
+
+### 3a. A hot key (recommended)
+
+With the key above on the server, anyone who breaks into the host takes the node account and
+everything it has earned. Instead, keep the node account in a wallet you hold elsewhere (a
+hardware wallet, or a machine that is not the node) and give the server a **hot key** that may
+only send the node's messages for that account (authz) and have their fees paid by it
+(feegrant, limited to those messages). The node account is still the one the chain knows, and
+earnings still reach it; the hot key holds nothing.
+
+```sh
+dvpnd keys add hot                                      # on the server; no backup needed
+dvpnd config set keyring.from hot
+dvpnd config set keyring.granter sent1…                 # the node account
+dvpnd keys authz-commands                               # prints the grants to make
+```
+
+Run the five commands it prints with the `sentinelhub` CLI from the wallet that holds the node
+account: four authz grants (register, update details, update status, update session) and one
+fee allowance limited to `MsgExec`. They last a year by default (`--valid-for`) and the fee
+allowance is capped at 100 DVPN (`--spend-limit`). The fee grant also creates the hot key's
+account on the chain. Keep a few DVPN on the node account for the fees.
+
+At start the node checks the grants and refuses to run while one is missing or expired,
+naming it. It warns in the log when a grant expires within 14 days or the fee allowance would
+run out within that time; make the grants again before then. Clients see the node account as
+the operator; the node signs its handshake replies with the hot key, and a client that checks
+them looks up the grant on the chain (docs/protocols.md).
+
+**Moving an existing node to a hot key:** do the above (the installer does it with
+`--granter sent1…`), restart, and check `journalctl -u dvpnd` shows `Signing with a hot key`
+and a successful status update. Then, holding the operator key's mnemonic somewhere safe, delete
+the key from the server with `dvpnd keys delete operator`, and delete any file that holds the
+mnemonic. The node address and its sessions are unchanged.
 
 ## 4. TLS certificate
 
@@ -533,8 +570,9 @@ real traffic this way and reported it on chain.
   no measurement was possible: every reachable speed test server was inside this host's
   network, or the speed test service was unreachable and nothing was cached. The node runs
   regardless; declare the link in `[bandwidth]` or restart once the service is back.
-- **Earnings** accrue to the operator `sent1…` address as sessions settle. Sweep them to a
-  wallet you hold offline; the key on the node is unencrypted.
+- **Earnings** accrue to the operator `sent1…` address as sessions settle. With a hot key
+  (§3a) that account is not on the server at all. Without one, sweep them to a wallet you
+  hold offline; the key on the node is unencrypted, and so is any file holding its mnemonic.
 - **Upgrade:** on the host, re-run `scripts/install.sh` (it rebuilds the latest release and
   restarts the service), or build the new version, `sudo systemctl stop dvpnd`, install the
   binary, `sudo systemctl start dvpnd`. In Docker, rebuild or pull the image, `docker rm -f

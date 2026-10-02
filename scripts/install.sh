@@ -50,6 +50,7 @@ VERSION=""
 SOURCE_DIR=""
 NODE_HOME="/root/.dvpnd"
 KEY_NAME="operator"
+GRANTER=""
 RECOVER=0
 FORCE=0
 YES=0
@@ -74,6 +75,9 @@ Options:
   --version TAG         release tag to build, e.g. v9.2.0 (default: latest release)
   --source DIR          build from this source tree instead of cloning
   --home DIR            node home directory (default ${NODE_HOME})
+  --granter ADDR        sign with a hot key for the node account ADDR (sent1...): the
+                        operator key and the earnings stay off this server; prints the
+                        authz and feegrant commands to run from that account's wallet
   --recover             import an existing mnemonic instead of creating a key
   --force               overwrite an existing configuration and protocol file
   --no-firewall         do not touch ufw
@@ -100,6 +104,7 @@ while [[ $# -gt 0 ]]; do
     --version) VERSION="$2"; shift 2 ;;
     --source) SOURCE_DIR="$2"; shift 2 ;;
     --home) NODE_HOME="$2"; shift 2 ;;
+    --granter) GRANTER="$2"; shift 2 ;;
     --recover) RECOVER=1; shift ;;
     --force) FORCE=1; shift ;;
     --no-firewall) FIREWALL=0; shift ;;
@@ -130,6 +135,13 @@ case "${NODE_TYPE}" in
   *) die "--type must be wireguard, amneziawg, openvpn, v2ray, xray or hysteria2" ;;
 esac
 case "${OPENVPN_PROTO}" in udp|tcp) ;; *) die "--openvpn-proto must be udp or tcp" ;; esac
+# With a granter the key on this server is a hot key of its own, never the
+# node account's.
+if [[ -n "${GRANTER}" ]]; then
+  [[ "${GRANTER}" =~ ^sent1[0-9a-z]{38}$ ]] || die "--granter must be the node account's address (sent1...)"
+  [[ "${RECOVER}" -eq 0 ]] || die "--granter creates a fresh hot key; --recover does not apply"
+  KEY_NAME="hot"
+fi
 
 # ---------------------------------------------------------------- preflight
 
@@ -337,6 +349,12 @@ else
   dv config set node.listen_on "0.0.0.0:${API_PORT}" >/dev/null
   dv config set node.remote_url "https://${PUBLIC_IP}:${API_PORT}" >/dev/null
 fi
+# A granter switches an existing node to a hot key too (a migration).
+if [[ -n "${GRANTER}" ]]; then
+  OLD_KEY=$(awk -F '[="]' '{ gsub(/ /, "") } /^\[keyring\]/ { f = 1 } f && /^from/ { print $3; exit }' "${NODE_HOME}/config.toml")
+  dv config set keyring.from "${KEY_NAME}" >/dev/null
+  dv config set keyring.granter "${GRANTER}" >/dev/null
+fi
 
 proto_file() {
   case "${NODE_TYPE}" in
@@ -401,6 +419,11 @@ key_exists() {
 
 if key_exists; then
   log "Keeping the existing key '${KEY_NAME}'"
+elif [[ -n "${GRANTER}" ]]; then
+  log "Creating the hot key"
+  dv keys add "${KEY_NAME}" >/dev/null
+  echo "The hot key only signs for the node account. It holds no funds and needs no backup:"
+  echo "if it is lost, create another and grant it again."
 else
   if [[ "${RECOVER}" -eq 1 ]]; then
     log "Importing the operator key: paste the mnemonic when asked"
@@ -478,6 +501,11 @@ fi
 
 # `keys show` prints Name, Address (sentnode1...), Operator (sent1...).
 read -r _ NODE_ADDR OPERATOR_ADDR < <(dv keys show "${KEY_NAME}" | awk 'NR == 2')
+if [[ -n "${GRANTER}" ]]; then
+  HOT_ADDR="${OPERATOR_ADDR}"
+  OPERATOR_ADDR="${GRANTER}"
+  NODE_ADDR=$(dv keys authz-commands | awk '/^# Node address:/ { print $4; exit }')
+fi
 
 cat <<EOF
 
@@ -494,6 +522,34 @@ cat <<EOF
   node address     ${NODE_ADDR}
   home directory   ${NODE_HOME}
 
+EOF
+if [[ -n "${GRANTER}" ]]; then
+  cat <<EOF
+  hot key          ${HOT_ADDR}
+
+What to do now:
+
+1. From the wallet that holds the node account ${GRANTER},
+   not on this server, make the grants the node needs (the node account pays every
+   fee; keep a few P2P on it, 50 is a comfortable start):
+
+EOF
+  dv keys authz-commands | sed 's/^/   /'
+  cat <<EOF
+
+   The node refuses to start until the grants exist; it retries every 15 seconds,
+   so it comes up by itself once they are made.
+EOF
+  if [[ -n "${OLD_KEY:-}" && "${OLD_KEY}" != "${KEY_NAME}" ]] && dv keys show "${OLD_KEY}" >/dev/null 2>&1; then
+    cat <<EOF
+   Once it runs on the hot key, delete the old key from this server, after
+   making sure you hold its mnemonic elsewhere:
+     dvpnd --home ${NODE_HOME} keys delete ${OLD_KEY}
+EOF
+  fi
+else
+  cat <<EOF
+
 What to do now:
 
 1. Send a few P2P (the coin formerly called DVPN) to the operator wallet above,
@@ -501,6 +557,7 @@ What to do now:
    report is a transaction that costs gas; the node cannot register until the
    wallet holds some. Until then it retries and the log shows the error.
 EOF
+fi
 # Step 2 exists only behind a router; the steps after it follow on from 1 or 2.
 step=2
 if [[ "${BEHIND_NAT}" -eq 1 ]]; then

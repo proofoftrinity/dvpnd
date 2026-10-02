@@ -76,8 +76,10 @@ key on; the name is what `GET /` reports as `service_type`.
   `reply data` is `result.data` decoded, `addrs` is `result.addrs` in order. The signature
   is made the way the client signs its request: secp256k1 ECDSA over SHA-256 of the
   32-byte digest, low-s, 64 bytes. A client accepts it when the key's account address is
-  the node's (the bytes of its `sentnode` address), or, once the node signs with an authz
-  hot key, when the chain shows a grant from the node account to that key's address. The
+  the node's (the bytes of its `sentnode` address), or, for a node that signs with an authz
+  hot key, when the chain holds a grant from the node account to that key's address for
+  `/sentinel.node.v3.MsgUpdateNodeStatusRequest` (authz `Grants` query with granter, grantee
+  and that message type). The
   header is exposed to browsers through CORS. The legacy endpoint's replies are not signed.
 - The session key stored by the node is `base64(peer data)`; `Peers()` must return each
   peer with exactly that key, or its usage is never reported.
