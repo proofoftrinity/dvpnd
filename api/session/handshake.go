@@ -144,6 +144,14 @@ func HandlerHandshake(ctx *context.Context) gin.HandlerFunc {
 			return
 		}
 
+		// The peer is admitted by now, so a reply that cannot be signed still
+		// goes out; the client decides whether to use it.
+		if header, err := signReply(ctx.Client(), body.ID, data, result); err != nil {
+			ctx.Log().Error("could not sign the handshake reply", "error", err)
+		} else {
+			c.Header(ReplySignatureHeader, header)
+		}
+
 		c.JSON(http.StatusOK, types.NewResponseResult(result))
 	}
 }

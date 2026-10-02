@@ -31,6 +31,7 @@ import (
 	"gorm.io/gorm/logger"
 
 	"github.com/trinitystake/dvpnd/v9/api"
+	"github.com/trinitystake/dvpnd/v9/api/session"
 	"github.com/trinitystake/dvpnd/v9/context"
 	"github.com/trinitystake/dvpnd/v9/libs/bandwidth"
 	"github.com/trinitystake/dvpnd/v9/libs/geoip"
@@ -313,6 +314,11 @@ func StartCmd() *cobra.Command {
 						},
 						AllowHeaders: []string{
 							types.ContentType,
+						},
+						// A client running in a browser must be able to
+						// read the reply's signature.
+						ExposeHeaders: []string{
+							session.ReplySignatureHeader,
 						},
 					},
 				)

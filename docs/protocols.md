@@ -61,6 +61,24 @@ key on; the name is what `GET /` reports as `service_type`.
 - `POST /` (handshake): body `{data: base64(JSON peer request), id, pub_key:
   "secp256k1:…", signature}`; the signature covers `BE64(id) || raw JSON`. The answer is
   `{success: true, result: {data: base64(JSON payload), addrs: [node hosts]}}`.
+- The answer to a successful `POST /` carries the node's signature in a response header,
+  so the body stays byte-identical to what clients and probes accept (a probe once refused
+  extra keys in the body). Clients pin a self-signed certificate nothing on the chain
+  vouches for; the signature is what proves the reply came from the node they paid:
+
+  ```
+  X-Dvpnd-Signature: secp256k1:<base64 compressed public key>;<base64 r||s>
+  digest = SHA-256( "dvpnd/handshake-reply/v1" || BE64(id) || SHA-256(request data)
+                    || SHA-256(reply data) || addrs joined by "\n" )
+  ```
+
+  `request data` is the peer request the client signed (its body's `data`, decoded),
+  `reply data` is `result.data` decoded, `addrs` is `result.addrs` in order. The signature
+  is made the way the client signs its request: secp256k1 ECDSA over SHA-256 of the
+  32-byte digest, low-s, 64 bytes. A client accepts it when the key's account address is
+  the node's (the bytes of its `sentnode` address), or, once the node signs with an authz
+  hot key, when the chain shows a grant from the node account to that key's address. The
+  header is exposed to browsers through CORS. The legacy endpoint's replies are not signed.
 - The session key stored by the node is `base64(peer data)`; `Peers()` must return each
   peer with exactly that key, or its usage is never reported.
 - `RemovePeer` is called by the node (session expired, allocation exceeded, account

@@ -11,6 +11,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/client/flags"
 	"github.com/cosmos/cosmos-sdk/client/tx"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
+	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
@@ -148,6 +149,13 @@ func (c *Client) WithTxConfig(v client.TxConfig) *Client {
 	c.ctx = c.ctx.WithTxConfig(v)
 	c.txf = c.txf.WithTxConfig(v)
 	return c
+}
+
+// SignBytes signs msg with the node's signing key the way the SDK signs
+// (secp256k1 ECDSA over SHA-256 of msg) and returns the signature with the
+// key's public half.
+func (c *Client) SignBytes(msg []byte) ([]byte, cryptotypes.PubKey, error) {
+	return c.ctx.Keyring.Sign(c.FromName(), msg)
 }
 
 func (c *Client) FromAddress() sdk.AccAddress { return c.ctx.FromAddress }
