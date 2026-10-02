@@ -9,7 +9,6 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"fmt"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -47,6 +46,8 @@ type V2Ray struct {
 	config  *v2raytypes.Config
 	peers   *v2raytypes.Peers
 	tlsPin  string
+	// configPath is the rendered configuration, written by Init.
+	configPath string
 
 	connMu sync.Mutex // guards conn: handshakes and the jobs call the API at once
 	conn   *grpc.ClientConn
@@ -72,9 +73,8 @@ func NewV2Ray() *V2Ray {
 	}
 }
 
-func (s *V2Ray) configFilePath() string {
-	return filepath.Join(os.TempDir(), "v2ray_config.json")
-}
+// configFileName is the rendered configuration in the runtime directory.
+const configFileName = "v2ray_config.json"
 
 func (s *V2Ray) Type() uint64 {
 	return v2raytypes.Type
@@ -112,10 +112,13 @@ func (s *V2Ray) Init(home string) (err error) {
 	if s.config.VMess.TLS {
 		s.config.VMess.Security = "tls"
 	}
-	s.config.VMess.TLSCertPath = filepath.Join(home, "tls.crt")
-	s.config.VMess.TLSKeyPath = filepath.Join(home, "tls.key")
 	if s.config.VMess.TLS {
-		s.tlsPin, err = common.CertificatePin(s.config.VMess.TLSCertPath)
+		s.tlsPin, err = common.CertificatePin(filepath.Join(home, "tls.crt"))
+		if err != nil {
+			return err
+		}
+		// v2ray may run as the proxy account, which cannot read the home.
+		s.config.VMess.TLSCertPath, s.config.VMess.TLSKeyPath, err = common.CurrentRuntime().TLSFiles(home)
 		if err != nil {
 			return err
 		}
@@ -138,7 +141,7 @@ func (s *V2Ray) Init(home string) (err error) {
 	if err = t.Execute(&buf, data); err != nil {
 		return err
 	}
-	if err = os.WriteFile(s.configFilePath(), buf.Bytes(), 0600); err != nil {
+	if s.configPath, err = common.CurrentRuntime().WriteFile(configFileName, buf.Bytes()); err != nil {
 		return err
 	}
 
@@ -154,8 +157,8 @@ func (s *V2Ray) Start() (err error) {
 	// VMess runs with v2ray's default, AEAD headers only: the legacy
 	// header's MD5 authentication is weak, and current clients (alterId 0
 	// on a v2ray or xray core) send AEAD.
-	s.process, err = common.StartProcess(binaryName,
-		[]string{"run", "--config", s.configFilePath()}, nil)
+	s.process, err = common.StartProxy(binaryName,
+		[]string{"run", "--config", s.configPath}, nil, s.config.VMess.ListenPort)
 
 	return err
 }

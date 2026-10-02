@@ -75,7 +75,7 @@ type fakeTables struct {
 func newFakeTables() *fakeTables {
 	f := &fakeTables{chains: map[string]map[string][]string{}}
 	for _, tool := range []string{"iptables", "ip6tables"} {
-		f.chains[tool] = map[string][]string{"FORWARD": {}, "INPUT": {}}
+		f.chains[tool] = map[string][]string{"FORWARD": {}, "INPUT": {}, "OUTPUT": {}}
 	}
 
 	return f
@@ -222,7 +222,7 @@ func TestTunnelEgressUpDown(t *testing.T) {
 
 	e.Down()
 	for _, tool := range []string{"iptables", "ip6tables"} {
-		if len(f.chains[tool]) != 2 || len(f.chains[tool]["FORWARD"]) != 0 || len(f.chains[tool]["INPUT"]) != 0 {
+		if len(f.chains[tool]) != 3 || len(f.chains[tool]["FORWARD"]) != 0 || len(f.chains[tool]["INPUT"]) != 0 {
 			t.Fatalf("%s after Down: %v", tool, f.chains[tool])
 		}
 	}

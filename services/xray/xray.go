@@ -59,6 +59,8 @@ type XRay struct {
 	config  *xraytypes.Config
 	peers   *common.PeerSet
 	tlsPin  string
+	// configPath is the rendered configuration, written by Init.
+	configPath string
 
 	connMu sync.Mutex // guards conn: handshakes and the jobs call the API at once
 	conn   *grpc.ClientConn
@@ -86,9 +88,8 @@ func (s *XRay) TLSPin() string {
 	return s.tlsPin
 }
 
-func (s *XRay) configFilePath() string {
-	return filepath.Join(os.TempDir(), "xray_config.json")
-}
+// configFileName is the rendered configuration in the runtime directory.
+const configFileName = "xray_config.json"
 
 func (s *XRay) Init(home string) (err error) {
 	if _, err = exec.LookPath(binaryName); err != nil {
@@ -132,6 +133,11 @@ func (s *XRay) Init(home string) (err error) {
 		if _, err = os.Stat(data.TLSKeyPath); err != nil {
 			return fmt.Errorf("tls key: %w", err)
 		}
+		// xray may run as the proxy account, which cannot read the home.
+		data.TLSCertPath, data.TLSKeyPath, err = common.CurrentRuntime().TLSFiles(home)
+		if err != nil {
+			return err
+		}
 	}
 
 	t, err := template.New("xray_json").Funcs(template.FuncMap{"json": common.JSON}).Parse(configTemplate)
@@ -143,7 +149,7 @@ func (s *XRay) Init(home string) (err error) {
 	if err = t.Execute(&buf, data); err != nil {
 		return err
 	}
-	if err = os.WriteFile(s.configFilePath(), buf.Bytes(), 0600); err != nil {
+	if s.configPath, err = common.CurrentRuntime().WriteFile(configFileName, buf.Bytes()); err != nil {
 		return err
 	}
 
@@ -156,7 +162,7 @@ func (s *XRay) Init(home string) (err error) {
 }
 
 func (s *XRay) Start() (err error) {
-	s.process, err = common.StartProcess(binaryName, []string{"run", "-config", s.configFilePath()}, nil)
+	s.process, err = common.StartProxy(binaryName, []string{"run", "-config", s.configPath}, nil, s.config.VLESS.ListenPort)
 
 	return err
 }

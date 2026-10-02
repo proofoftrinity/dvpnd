@@ -128,60 +128,84 @@ type TunnelEgress struct {
 func (e TunnelEgress) ForwardChain() string { return "DVPND-FWD-" + e.Interface }
 func (e TunnelEgress) InputChain() string   { return "DVPND-IN-" + e.Interface }
 
-// family is one iptables binary and the rules that differ by address family.
+// family is one iptables binary with the blocked networks of its address
+// family.
 type family struct {
 	tool    string
+	v6      bool
 	blocked []string
-	dns     bool // the resolver is in this family
 }
 
-func (e TunnelEgress) families(policy Egress) []family {
-	v4 := family{tool: "iptables", blocked: BlockedNetworksV4, dns: policy.Resolver.To4() != nil}
-	families := []family{v4}
+// families are the address families the kernel has: IPv4 always, IPv6
+// unless the kernel was booted without it.
+func families() []family {
+	list := []family{{tool: "iptables", blocked: BlockedNetworksV4}}
 	if _, err := os.Stat(ipv6Present); err == nil {
-		v6 := family{tool: "ip6tables", blocked: BlockedNetworksV6,
-			dns: policy.Resolver != nil && policy.Resolver.To4() == nil}
-		families = append(families, v6)
+		list = append(list, family{tool: "ip6tables", v6: true, blocked: BlockedNetworksV6})
 	}
 
-	return families
+	return list
 }
 
-// chainRules are the rules appended to the two chains, in order.
-func (e TunnelEgress) chainRules(f family, policy Egress) [][]string {
-	var (
-		fwd   = e.ForwardChain()
-		in    = e.InputChain()
-		rules [][]string
-	)
+// inFamily reports whether ip belongs to the family.
+func (f family) inFamily(ip net.IP) bool {
+	return ip != nil && (ip.To4() == nil) == f.v6
+}
 
-	rules = append(rules, []string{"-A", fwd, "-o", e.Interface, "-j", "DROP"})
-	for _, cidr := range f.blocked {
-		rules = append(rules, []string{"-A", fwd, "-d", cidr, "-j", "DROP"})
-	}
-	if !policy.AllowSMTP {
-		rules = append(rules, []string{"-A", fwd, "-p", "tcp", "--dport", strconv.Itoa(SMTPPort), "-j", "DROP"})
-	}
+// chains is a set of iptables chains of the node's own and the jumps into
+// them from the built-in chains. up fills the chains before it jumps to
+// them, so no packet passes unfiltered while the rules go in; it refills
+// chains an earlier run left behind and adds a jump only where none is, so a
+// node that died without down leaves nothing to clean up by hand.
+type chains struct {
+	names []string
+	// rules are the rules appended to the chains, in order, for a family.
+	rules func(f family) [][]string
+	// jumps are the rules inserted at the top of built-in chains, as
+	// {builtin, match..., "-j", chain}.
+	jumps [][]string
+}
 
-	rules = append(rules, []string{"-A", in, "-m", "conntrack", "--ctstate", "RELATED,ESTABLISHED", "-j", "ACCEPT"})
-	if f.dns {
-		for _, proto := range []string{"udp", "tcp"} {
-			rules = append(rules, []string{"-A", in, "-d", policy.Resolver.String(), "-p", proto, "--dport", "53", "-j", "ACCEPT"})
+func (c chains) up() error {
+	for _, f := range families() {
+		for _, chain := range c.names {
+			// -N fails when the chain is left from an earlier run; then it is
+			// emptied instead.
+			if RunQuiet(f.tool, "-N", chain) != nil {
+				if err := run(f.tool, "-F", chain); err != nil {
+					return err
+				}
+			}
+		}
+		for _, rule := range c.rules(f) {
+			if err := run(f.tool, rule...); err != nil {
+				return err
+			}
+		}
+		for _, jump := range c.jumps {
+			if RunQuiet(f.tool, append([]string{"-C"}, jump...)...) == nil {
+				continue
+			}
+			if err := run(f.tool, append([]string{"-I", jump[0], "1"}, jump[1:]...)...); err != nil {
+				return err
+			}
 		}
 	}
-	if policy.APIPort != 0 {
-		rules = append(rules, []string{"-A", in, "-p", "tcp", "--dport", strconv.Itoa(int(policy.APIPort)), "-j", "ACCEPT"})
-	}
-	rules = append(rules, []string{"-A", in, "-j", "DROP"})
 
-	return rules
+	return nil
 }
 
-// jumps are the rules that send the interface's traffic into the chains.
-func (e TunnelEgress) jumps() [][]string {
-	return [][]string{
-		{"FORWARD", "-i", e.Interface, "-j", e.ForwardChain()},
-		{"INPUT", "-i", e.Interface, "-j", e.InputChain()},
+// down removes the jumps and the chains; what is already gone is not an
+// error.
+func (c chains) down() {
+	for _, f := range families() {
+		for _, jump := range c.jumps {
+			_ = RunQuiet(f.tool, append([]string{"-D"}, jump...)...)
+		}
+		for _, chain := range c.names {
+			_ = RunQuiet(f.tool, "-F", chain)
+			_ = RunQuiet(f.tool, "-X", chain)
+		}
 	}
 }
 
@@ -201,49 +225,137 @@ func run(tool string, args ...string) error {
 	return nil
 }
 
-// Up installs the chains and their jumps under the current egress policy.
-// The chains are filled before they are jumped to, so no packet from the
-// interface passes unfiltered while the rules go in.
-func (e TunnelEgress) Up() error {
-	policy := EgressPolicy()
-	for _, f := range e.families(policy) {
-		for _, chain := range []string{e.ForwardChain(), e.InputChain()} {
-			// -N fails when the chain is left from an earlier run; then it is
-			// emptied instead.
-			if RunQuiet(f.tool, "-N", chain) != nil {
-				if err := run(f.tool, "-F", chain); err != nil {
-					return err
+func (e TunnelEgress) chains(policy Egress) chains {
+	fwd, in := e.ForwardChain(), e.InputChain()
+
+	return chains{
+		names: []string{fwd, in},
+		rules: func(f family) [][]string {
+			var rules [][]string
+
+			rules = append(rules, []string{"-A", fwd, "-o", e.Interface, "-j", "DROP"})
+			for _, cidr := range f.blocked {
+				rules = append(rules, []string{"-A", fwd, "-d", cidr, "-j", "DROP"})
+			}
+			if !policy.AllowSMTP {
+				rules = append(rules, []string{"-A", fwd, "-p", "tcp", "--dport", strconv.Itoa(SMTPPort), "-j", "DROP"})
+			}
+
+			rules = append(rules, []string{"-A", in, "-m", "conntrack", "--ctstate", "RELATED,ESTABLISHED", "-j", "ACCEPT"})
+			if f.inFamily(policy.Resolver) {
+				for _, proto := range []string{"udp", "tcp"} {
+					rules = append(rules, []string{"-A", in, "-d", policy.Resolver.String(), "-p", proto, "--dport", "53", "-j", "ACCEPT"})
 				}
 			}
-		}
-		for _, rule := range e.chainRules(f, policy) {
-			if err := run(f.tool, rule...); err != nil {
-				return err
+			if policy.APIPort != 0 {
+				rules = append(rules, []string{"-A", in, "-p", "tcp", "--dport", strconv.Itoa(int(policy.APIPort)), "-j", "ACCEPT"})
 			}
-		}
-		for _, jump := range e.jumps() {
-			if RunQuiet(f.tool, append([]string{"-C"}, jump...)...) == nil {
-				continue
-			}
-			if err := run(f.tool, append([]string{"-I", jump[0], "1"}, jump[1:]...)...); err != nil {
-				return err
-			}
-		}
-	}
+			rules = append(rules, []string{"-A", in, "-j", "DROP"})
 
-	return nil
+			return rules
+		},
+		jumps: [][]string{
+			{"FORWARD", "-i", e.Interface, "-j", fwd},
+			{"INPUT", "-i", e.Interface, "-j", in},
+		},
+	}
 }
 
-// Down removes the jumps and the chains; what is already gone is not an
-// error.
+// Up installs the chains and their jumps under the current egress policy.
+func (e TunnelEgress) Up() error {
+	return e.chains(EgressPolicy()).up()
+}
+
+// Down removes the jumps and the chains.
 func (e TunnelEgress) Down() {
-	for _, f := range e.families(Egress{}) {
-		for _, jump := range e.jumps() {
-			_ = RunQuiet(f.tool, append([]string{"-D"}, jump...)...)
+	e.chains(Egress{}).down()
+}
+
+// ProxyChain is the chain that holds the proxy account's outgoing traffic.
+const ProxyChain = "DVPND-PROXY"
+
+// ProxyEgress is the egress policy in the kernel for a proxy daemon that runs
+// as the proxy account: one chain jumped to from the top of OUTPUT for every
+// packet that account sends. The proxies apply the policy themselves too,
+// but they resolve a name once to match it and again to dial it, so a name
+// whose answer changes in between (DNS rebinding) could reach a blocked
+// address; the kernel sees only the address actually dialled. The chain
+// accepts replies, DNS to the host's resolvers, and the loopback ports the
+// daemon must reach (Hysteria's authentication hook), and rejects the
+// blocked networks and TCP port 25 unless allowed.
+type ProxyEgress struct {
+	UID           uint32
+	LoopbackPorts []uint16
+}
+
+// resolvConf is where the host's resolvers are listed; a variable so tests
+// can point it elsewhere.
+var resolvConf = "/etc/resolv.conf"
+
+// nameservers lists the resolvers in resolv.conf.
+func nameservers() []net.IP {
+	raw, err := os.ReadFile(resolvConf)
+	if err != nil {
+		return nil
+	}
+
+	var list []net.IP
+	for _, line := range strings.Split(string(raw), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 2 || fields[0] != "nameserver" {
+			continue
 		}
-		for _, chain := range []string{e.ForwardChain(), e.InputChain()} {
-			_ = RunQuiet(f.tool, "-F", chain)
-			_ = RunQuiet(f.tool, "-X", chain)
+		host, _, _ := strings.Cut(fields[1], "%") // a link-local zone
+		if ip := net.ParseIP(host); ip != nil {
+			list = append(list, ip)
 		}
 	}
+
+	return list
+}
+
+func (e ProxyEgress) chains(policy Egress) chains {
+	resolvers := nameservers()
+
+	return chains{
+		names: []string{ProxyChain},
+		rules: func(f family) [][]string {
+			rules := [][]string{{"-A", ProxyChain, "-m", "conntrack", "--ctstate", "RELATED,ESTABLISHED", "-j", "ACCEPT"}}
+			if !f.v6 {
+				for _, port := range e.LoopbackPorts {
+					rules = append(rules, []string{"-A", ProxyChain, "-o", "lo", "-d", "127.0.0.1", "-p", "tcp",
+						"--dport", strconv.Itoa(int(port)), "-j", "ACCEPT"})
+				}
+			}
+			for _, ip := range resolvers {
+				if !f.inFamily(ip) {
+					continue
+				}
+				for _, proto := range []string{"udp", "tcp"} {
+					rules = append(rules, []string{"-A", ProxyChain, "-d", ip.String(), "-p", proto, "--dport", "53", "-j", "ACCEPT"})
+				}
+			}
+			for _, cidr := range f.blocked {
+				rules = append(rules, []string{"-A", ProxyChain, "-d", cidr, "-j", "REJECT"})
+			}
+			if !policy.AllowSMTP {
+				rules = append(rules, []string{"-A", ProxyChain, "-p", "tcp", "--dport", strconv.Itoa(SMTPPort), "-j", "REJECT"})
+			}
+
+			return rules
+		},
+		jumps: [][]string{
+			{"OUTPUT", "-m", "owner", "--uid-owner", strconv.FormatUint(uint64(e.UID), 10), "-j", ProxyChain},
+		},
+	}
+}
+
+// Up installs the chain and its jump under the current egress policy.
+func (e ProxyEgress) Up() error {
+	return e.chains(EgressPolicy()).up()
+}
+
+// Down removes the jump and the chain.
+func (e ProxyEgress) Down() {
+	e.chains(Egress{}).down()
 }

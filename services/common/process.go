@@ -30,16 +30,19 @@ func Verbose() bool { return verbose.Load() }
 type Process struct {
 	cmd    *exec.Cmd
 	exited chan error // receives the child's Wait result once it has exited
+	onStop func()     // runs once the child has exited after Stop
 }
 
 // StartProcess launches name with args; extraEnv is appended to the current
-// environment. The child's output goes to the node's stdout and stderr, and a
-// goroutine reaps it whenever it exits so a crash leaves no zombie.
-func StartProcess(name string, args []string, extraEnv []string) (*Process, error) {
+// environment and attr, when set, says which account the child runs as. The
+// child's output goes to the node's stdout and stderr, and a goroutine reaps
+// it whenever it exits so a crash leaves no zombie.
+func StartProcess(name string, args []string, extraEnv []string, attr *syscall.SysProcAttr) (*Process, error) {
 	cmd := exec.Command(name, args...)
 	cmd.Env = append(os.Environ(), extraEnv...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	cmd.SysProcAttr = attr
 
 	if err := cmd.Start(); err != nil {
 		return nil, err
@@ -56,6 +59,9 @@ func StartProcess(name string, args []string, extraEnv []string) (*Process, erro
 func (p *Process) Stop(timeout time.Duration) error {
 	if p == nil || p.cmd == nil || p.cmd.Process == nil {
 		return errors.New("process was not started")
+	}
+	if p.onStop != nil {
+		defer p.onStop()
 	}
 
 	if err := p.cmd.Process.Signal(syscall.SIGTERM); err != nil && !errors.Is(err, os.ErrProcessDone) {

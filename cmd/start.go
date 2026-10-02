@@ -253,6 +253,22 @@ func StartCmd() *cobra.Command {
 				log.Info("Clients may send mail: [egress] allow_smtp is on")
 			}
 
+			// The protocol daemons read their files from the runtime
+			// directory and, when the node runs as root and the proxy account
+			// exists, run as that account.
+			rt, err := common.PrepareRuntime(home, os.Geteuid())
+			if err != nil {
+				return err
+			}
+			common.SetRuntime(rt)
+			switch {
+			case rt.Proxy != nil && protocol.Daemon:
+				log.Info("Protocol daemons run unprivileged", "account", common.ProxyUserName, "runtime", rt.Dir)
+			case os.Geteuid() == 0 && protocol.Daemon:
+				log.Error("Protocol daemons run as root: create the " + common.ProxyUserName +
+					" system account (the installer and the Docker image do) to run them unprivileged")
+			}
+
 			log.Info("Initializing the VPN service", "type", service.Type())
 			if err = service.Init(home); err != nil {
 				return err

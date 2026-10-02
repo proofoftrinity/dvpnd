@@ -150,6 +150,10 @@ func (s *Hysteria) Init(home string) (err error) {
 	if _, err = os.Stat(data.TLSKeyPath); err != nil {
 		return fmt.Errorf("tls key: %w", err)
 	}
+	// hysteria may run as the proxy account, which cannot read the home.
+	if data.TLSCertPath, data.TLSKeyPath, err = common.CurrentRuntime().TLSFiles(home); err != nil {
+		return err
+	}
 
 	secret := make([]byte, 16)
 	if _, err = rand.Read(secret); err != nil {
@@ -167,8 +171,7 @@ func (s *Hysteria) Init(home string) (err error) {
 	if err = t.Execute(&buf, data); err != nil {
 		return err
 	}
-	s.configPath = filepath.Join(os.TempDir(), "hysteria_config.yaml")
-	if err = os.WriteFile(s.configPath, buf.Bytes(), 0600); err != nil {
+	if s.configPath, err = common.CurrentRuntime().WriteFile("hysteria_config.yaml", buf.Bytes()); err != nil {
 		return err
 	}
 
@@ -219,7 +222,8 @@ func (s *Hysteria) Start() error {
 		close(s.authDone)
 	}()
 
-	s.process, err = common.StartProcess(binaryName, serverArgs(s.configPath), nil)
+	s.process, err = common.StartProxy(binaryName, serverArgs(s.configPath), nil,
+		s.config.Server.ListenPort, s.config.API.AuthPort)
 	if err != nil {
 		_ = s.auth.Close()
 

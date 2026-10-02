@@ -40,15 +40,18 @@ type Protocol struct {
 	// HandshakeDNS says whether the node may run the Handshake resolver next
 	// to this service; a proxy cannot make use of it.
 	HandshakeDNS bool
+	// Daemon says whether the service runs a protocol daemon that can drop
+	// to the proxy account (common.ProxyUserName).
+	Daemon bool
 }
 
 var registry = []Protocol{
 	{Name: wireguard.Name, Type: wgtypes.Type, New: wireguard.NewService, Command: wireguard.Command, HandshakeDNS: true},
-	{Name: v2ray.Name, Type: v2raytypes.Type, New: v2ray.NewService, Command: v2ray.Command},
-	{Name: xray.Name, Type: xraytypes.Type, New: xray.NewService, Command: xray.Command},
-	{Name: hysteria.Name, Type: hysteriatypes.Type, New: hysteria.NewService, Command: hysteria.Command},
+	{Name: v2ray.Name, Type: v2raytypes.Type, New: v2ray.NewService, Command: v2ray.Command, Daemon: true},
+	{Name: xray.Name, Type: xraytypes.Type, New: xray.NewService, Command: xray.Command, Daemon: true},
+	{Name: hysteria.Name, Type: hysteriatypes.Type, New: hysteria.NewService, Command: hysteria.Command, Daemon: true},
 	{Name: amneziawg.Name, Type: awgtypes.Type, New: amneziawg.NewService, Command: amneziawg.Command, HandshakeDNS: true},
-	{Name: openvpn.Name, Type: ovpntypes.Type, New: openvpn.NewService, Command: openvpn.Command, HandshakeDNS: true},
+	{Name: openvpn.Name, Type: ovpntypes.Type, New: openvpn.NewService, Command: openvpn.Command, HandshakeDNS: true, Daemon: true},
 }
 
 func init() {
