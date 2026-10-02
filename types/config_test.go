@@ -196,3 +196,23 @@ func TestEgressSMTPBlockedByDefault(t *testing.T) {
 		t.Fatalf("read back %+v, %v", back.Egress, err)
 	}
 }
+
+// TestRPCAddressesNeedTLS: the node trusts what its RPC answers, so plain
+// http is accepted only for an RPC on the same host.
+func TestRPCAddressesNeedTLS(t *testing.T) {
+	for addr, ok := range map[string]bool{
+		"https://rpc.example.com:443":                 true,
+		"http://127.0.0.1:26657":                      true,
+		"http://localhost:26657":                      true,
+		"http://[::1]:26657":                          true,
+		"http://rpc.example.com:80":                   false,
+		"http://192.168.1.5:26657":                    false,
+		"https://a.example:443,http://10.0.0.2:26657": false,
+	} {
+		c := NewChainConfig().WithDefaultValues()
+		c.RPCAddresses = addr
+		if err := c.Validate(); (err == nil) != ok {
+			t.Errorf("%s: err = %v", addr, err)
+		}
+	}
+}

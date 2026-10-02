@@ -68,7 +68,7 @@ gas_prices = {{ toml .Chain.GasPrices }}
 # The network chain ID
 id = {{ toml .Chain.ID }}
 
-# Comma separated Tendermint RPC addresses for the chain
+# Comma separated Tendermint RPC addresses for the chain; https, or http on loopback only
 rpc_addresses = {{ toml .Chain.RPCAddresses }}
 
 # Timeout seconds for querying the data from the RPC server
@@ -255,6 +255,11 @@ func (c *ChainConfig) Validate() error {
 		if uri.Scheme != "http" && uri.Scheme != "https" {
 			return errors.New("rpc_address scheme must be either http or https")
 		}
+		// The node trusts what the RPC answers (sessions it admits, their
+		// status), so on any path that leaves the host it must be TLS.
+		if uri.Scheme == "http" && !loopbackHost(uri.Hostname()) {
+			return fmt.Errorf("rpc_address %s must use https; plain http is accepted on loopback only", items[i])
+		}
 		if uri.Port() == "" {
 			return errors.New("rpc_address port cannot be empty")
 		}
@@ -268,6 +273,16 @@ func (c *ChainConfig) Validate() error {
 	}
 
 	return nil
+}
+
+// loopbackHost reports whether host names this machine's loopback.
+func loopbackHost(host string) bool {
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+
+	return ip != nil && ip.IsLoopback()
 }
 
 func (c *ChainConfig) WithDefaultValues() *ChainConfig {
