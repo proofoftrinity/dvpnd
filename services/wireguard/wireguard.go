@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -123,6 +124,12 @@ func TunnelAddress(pool *wgtypes.IPPool) string {
 	v6 := wgtypes.NewIPv6FromIP(pool.V6.Net.IP).Next().IP()
 
 	return fmt.Sprintf("%s/%d,%s/%d", v4, v4bits, v6, v6bits)
+}
+
+// TunnelIPv4 is the node's IPv4 address on the tunnel interface, the first
+// host of the pool (the address TunnelAddress gives the interface).
+func (s *WireGuard) TunnelIPv4() net.IP {
+	return wgtypes.NewIPv4FromIP(s.pool.V4.Net.IP).Next().IP()
 }
 
 func (s *WireGuard) Init(home string) (err error) {

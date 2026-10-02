@@ -51,3 +51,20 @@ func TestNodeTypesRegistered(t *testing.T) {
 		t.Fatal("v2ray with handshake DNS validated")
 	}
 }
+
+// TestHandshakeDNSTypesHaveATunnel: the Handshake resolver listens on the
+// tunnel address, so every type allowed to run it must report one.
+func TestHandshakeDNSTypesHaveATunnel(t *testing.T) {
+	for _, p := range All() {
+		if !p.HandshakeDNS {
+			continue
+		}
+		s, err := p.New(types.NewConfig().WithDefaultValues())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, ok := s.(types.TunnelHost); !ok {
+			t.Errorf("%s may run the Handshake resolver but has no tunnel address", p.Name)
+		}
+	}
+}

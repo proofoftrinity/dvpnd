@@ -40,6 +40,10 @@ func TestTunnelAddress(t *testing.T) {
 	if got := TunnelAddress(wgtypes.NewIPPool(v4, v6)); got != "10.9.0.1/24,fd86:ea04:1116::1/120" {
 		t.Fatalf("tunnel address: %s", got)
 	}
+	// The Handshake resolver listens on the same IPv4 address the interface gets.
+	if got := NewVariant(Default, wgtypes.NewIPPool(v4, v6)).TunnelIPv4().String(); got != "10.9.0.1" {
+		t.Fatalf("tunnel IPv4: %s", got)
+	}
 }
 
 func TestConfigTemplateForwardRules(t *testing.T) {

@@ -7,15 +7,18 @@ import (
 	"bufio"
 	gocontext "context"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
+	cmtlog "github.com/cometbft/cometbft/libs/log"
 	"github.com/cosmos/cosmos-sdk/client/flags"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	"github.com/gin-contrib/cors"
@@ -48,11 +51,31 @@ func init() {
 // spare, but never an open-ended wait on a remote service.
 const bandwidthTimeout = 5 * time.Minute
 
-func runHandshake(peers uint64) error {
-	return exec.Command("hnsd",
-		strings.Split(fmt.Sprintf("--log-file /dev/null "+
-			"--pool-size %d "+
-			"--rs-host 0.0.0.0:53", peers), " ")...).Run()
+// handshakeRestartDelay is the pause before the Handshake resolver is started
+// again after it exits, so a resolver that cannot run does not spin.
+const handshakeRestartDelay = 15 * time.Second
+
+// hnsdArgs is the Handshake resolver's command line. It listens on the node's
+// tunnel address only: on every address, as upstream had it, a node whose
+// port 53 was reachable would be an open resolver anyone could use against
+// third parties. It keeps no log of the names clients look up.
+func hnsdArgs(peers uint64, host net.IP) []string {
+	return []string{
+		"--log-file", "/dev/null",
+		"--pool-size", strconv.FormatUint(peers, 10),
+		"--rs-host", net.JoinHostPort(host.String(), "53"),
+	}
+}
+
+// runHandshake keeps the Handshake resolver running for the life of the node.
+func runHandshake(log cmtlog.Logger, peers uint64, host net.IP) {
+	for {
+		log.Info("Starting the Handshake resolver", "address", host)
+		if err := exec.Command("hnsd", hnsdArgs(peers, host)...).Run(); err != nil {
+			log.Error("handshake process exited unexpectedly", "error", err)
+		}
+		time.Sleep(handshakeRestartDelay)
+	}
 }
 
 func StartCmd() *cobra.Command {
@@ -205,17 +228,6 @@ func StartCmd() *cobra.Command {
 			bw := v1base.NewBandwidthFromInt64(measured.Upload, measured.Download)
 			log.Info("Bandwidth to advertise", "upload", bw.Upload, "download", bw.Download, "source", measured.Source)
 
-			if config.Handshake.Enable {
-				go func() {
-					for {
-						log.Info("Starting the Handshake process...")
-						if err := runHandshake(config.Handshake.Peers); err != nil {
-							log.Error("handshake process exited unexpectedly", "error", err)
-						}
-					}
-				}()
-			}
-
 			log.Info("Initializing the VPN service", "type", service.Type())
 			if err = service.Init(home); err != nil {
 				return err
@@ -224,6 +236,20 @@ func StartCmd() *cobra.Command {
 			log.Info("Starting the VPN service", "type", service.Type())
 			if err = service.Start(); err != nil {
 				return err
+			}
+
+			// The resolver binds the tunnel address, so it starts once the
+			// tunnel is up. Without hnsd installed it stays off, and the root
+			// document says so, rather than clients being sent to a resolver
+			// that is not there.
+			if config.Handshake.Enable {
+				host, ok := service.(types.TunnelHost)
+				if _, err := exec.LookPath("hnsd"); err != nil || !ok {
+					log.Error("The Handshake resolver stays off: hnsd is not installed or the node type has no tunnel")
+					config.Handshake.Enable = false
+				} else {
+					go runHandshake(log, config.Handshake.Peers, host.TunnelIPv4())
+				}
 			}
 
 			log.Info("Opening the database", "path", databasePath)

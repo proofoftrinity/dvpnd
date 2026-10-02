@@ -303,3 +303,9 @@ func TestVerbFollowsNodeLogLevel(t *testing.T) {
 		}
 	}
 }
+
+func TestTunnelIPv4(t *testing.T) {
+	if got := NewOpenVPN().TunnelIPv4().String(); got != "10.9.0.1" {
+		t.Fatalf("tunnel IPv4: %s", got)
+	}
+}

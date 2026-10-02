@@ -235,6 +235,11 @@ func TestInitDerivesTunnelNetworks(t *testing.T) {
 			t.Errorf("%s runs on %s", file, n.IPv4)
 		}
 	}
+	// The Handshake resolver listens on the default tier's interface address;
+	// clients of the 3.1 tier reach it there too, as it is the node's own.
+	if got, want := s.TunnelIPv4().String(), host(def.IPv4, 1); got != want {
+		t.Errorf("tunnel IPv4: %s, want %s", got, want)
+	}
 
 	for _, tc := range []struct {
 		req  string

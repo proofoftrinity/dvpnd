@@ -152,3 +152,9 @@ func TestConfigRedacted(t *testing.T) {
 		t.Fatalf("an empty token stays empty:\n%s", out)
 	}
 }
+
+func TestHandshakeResolverOffByDefault(t *testing.T) {
+	if NewConfig().WithDefaultValues().Handshake.Enable {
+		t.Fatal("the Handshake resolver needs hnsd, which is not installed with the node; it must be off by default")
+	}
+}

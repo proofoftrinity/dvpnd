@@ -14,6 +14,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -172,6 +173,14 @@ func (s *OpenVPN) Init(home string) (err error) {
 
 // Start launches the server, attaches to its management interface (nothing
 // is admitted until the node is attached) and installs the NAT rules.
+// TunnelIPv4 is the node's address inside the tunnel: OpenVPN's server
+// directive gives the server the first host of the network.
+func (s *OpenVPN) TunnelIPv4() net.IP {
+	ip := net.ParseIP(ipv4Network).To4()
+
+	return net.IPv4(ip[0], ip[1], ip[2], ip[3]+1)
+}
+
 func (s *OpenVPN) Start() (err error) {
 	if err = ensureForwarding(); err != nil {
 		return err

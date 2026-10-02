@@ -361,8 +361,10 @@ func (c *HandshakeConfig) Validate() error {
 	return nil
 }
 
+// WithDefaultValues leaves the Handshake resolver off: it needs hnsd, which is
+// not installed with the node, and is of no use to a proxy node.
 func (c *HandshakeConfig) WithDefaultValues() *HandshakeConfig {
-	c.Enable = true
+	c.Enable = false
 	c.Peers = 8
 
 	return c
