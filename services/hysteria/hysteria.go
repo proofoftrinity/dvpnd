@@ -135,6 +135,11 @@ func (s *Hysteria) Init(home string) (err error) {
 		API:         s.config.API,
 		TLSCertPath: filepath.Join(home, "tls.crt"),
 		TLSKeyPath:  filepath.Join(home, "tls.key"),
+
+		BlockedNetworks: common.BlockedNetworks(),
+		BlockedDomain:   common.BlockedLocalDomain,
+		SMTPPort:        common.SMTPPort,
+		AllowSMTP:       common.EgressPolicy().AllowSMTP,
 	}
 
 	pin, err := common.CertificatePin(data.TLSCertPath)

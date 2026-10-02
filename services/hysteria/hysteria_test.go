@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -372,5 +373,68 @@ func TestServerArgs(t *testing.T) {
 		if got := strings.Join(serverArgs("/h/c.yaml"), " "); got != tc.want {
 			t.Errorf("verbose %v: got %q, want %q", tc.verbose, got, tc.want)
 		}
+	}
+}
+
+// aclRule is the shape of one ACL line hysteria accepts:
+// outbound(address[, proto/port[, hijack]]).
+var aclRule = regexp.MustCompile(`^(\w+)\s*\(([^,]+)(?:,([^,]+))?(?:,([^,]+))?\)$`)
+
+// aclRules is the inline ACL of the rendered config, in order.
+func aclRules(t *testing.T, dir string) []string {
+	t.Helper()
+
+	raw, err := os.ReadFile(filepath.Join(dir, "hysteria_config.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, block, ok := strings.Cut(string(raw), "\nacl:\n  inline:\n")
+	if !ok {
+		t.Fatalf("no inline ACL:\n%s", raw)
+	}
+
+	var rules []string
+	for _, line := range strings.Split(strings.TrimRight(block, "\n"), "\n") {
+		item, ok := strings.CutPrefix(line, "    - ")
+		if !ok {
+			t.Fatalf("the ACL must be the last block; found %q", line)
+		}
+		rule, err := strconv.Unquote(item)
+		if err != nil || !aclRule.MatchString(rule) {
+			t.Fatalf("ACL line %q is not a hysteria rule (%v)", item, err)
+		}
+		rules = append(rules, rule)
+	}
+
+	return rules
+}
+
+// TestInitRendersEgressPolicy: a client cannot reach the blocked networks
+// (the auth hook and the statistics API on loopback among them), localhost by
+// name, or port 25 unless the operator allows it.
+func TestInitRendersEgressPolicy(t *testing.T) {
+	stubBinary(t)
+	t.Cleanup(func() { common.SetEgress(common.Egress{}) })
+
+	dir, _ := home(t, "")
+	if err := NewHysteria().Init(dir); err != nil {
+		t.Fatal(err)
+	}
+
+	want := []string{"reject(suffix:localhost)"}
+	for _, cidr := range common.BlockedNetworks() {
+		want = append(want, "reject("+cidr+")")
+	}
+	want = append(want, "reject(all, tcp/25)")
+	if got := aclRules(t, dir); strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("ACL:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+
+	common.SetEgress(common.Egress{AllowSMTP: true})
+	if err := NewHysteria().Init(dir); err != nil {
+		t.Fatal(err)
+	}
+	if got := aclRules(t, dir); len(got) != len(want)-1 || strings.Contains(strings.Join(got, " "), "tcp/25") {
+		t.Fatalf("allow_smtp: ACL %v", got)
 	}
 }
