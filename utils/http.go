@@ -6,10 +6,13 @@ package utils
 import (
 	"crypto/rand"
 	"crypto/tls"
+	"log"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
+	cmtlog "github.com/cometbft/cometbft/libs/log"
 	"github.com/soheilhy/cmux"
 )
 
@@ -26,18 +29,32 @@ const (
 	maxHeaderBytes    = 16 << 10
 )
 
+// debugWriter hands each line the HTTP server logs about a connection to the
+// node's logger at debug level. Left to itself the server prints them to
+// stderr whatever the node's log level, and they name the remote address
+// ("http: TLS handshake error from 203.0.113.9:4242: EOF"), which a node at the
+// default level must not keep.
+type debugWriter struct{ log cmtlog.Logger }
+
+func (w debugWriter) Write(p []byte) (int, error) {
+	w.log.Debug("HTTP server", "message", strings.TrimSpace(string(p)))
+
+	return len(p), nil
+}
+
 // newServer is the HTTP server for one side of the port (TLS or plain).
-func newServer(handler http.Handler) *http.Server {
+func newServer(handler http.Handler, logger cmtlog.Logger) *http.Server {
 	return &http.Server{
 		Handler:           handler,
 		ReadHeaderTimeout: readHeaderTimeout,
 		ReadTimeout:       readTimeout,
 		IdleTimeout:       idleTimeout,
 		MaxHeaderBytes:    maxHeaderBytes,
+		ErrorLog:          log.New(debugWriter{logger}, "", 0),
 	}
 }
 
-func ListenAndServeTLS(address, certFile, keyFile string, handler http.Handler) error {
+func ListenAndServeTLS(address, certFile, keyFile string, handler http.Handler, logger cmtlog.Logger) error {
 	l, err := net.Listen("tcp", address)
 	if err != nil {
 		return err
@@ -56,7 +73,7 @@ func ListenAndServeTLS(address, certFile, keyFile string, handler http.Handler) 
 	mux.SetReadTimeout(firstBytesTimeout)
 
 	go func() {
-		if err := newServer(handler).Serve(
+		if err := newServer(handler, logger).Serve(
 			tls.NewListener(
 				tlsMux,
 				&tls.Config{
@@ -72,7 +89,7 @@ func ListenAndServeTLS(address, certFile, keyFile string, handler http.Handler) 
 	}()
 
 	go func() {
-		if err := newServer(handler).Serve(anyMux); err != nil {
+		if err := newServer(handler, logger).Serve(anyMux); err != nil {
 			panic(err)
 		}
 	}()

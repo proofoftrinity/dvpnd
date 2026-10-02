@@ -62,5 +62,6 @@ func (n *Node) Start(home string) error {
 		certFile,
 		keyFile,
 		n.Handler(),
+		n.Log(),
 	)
 }
