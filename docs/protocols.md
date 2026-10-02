@@ -35,7 +35,8 @@ key on; the name is what `GET /` reports as `service_type`.
 ## The contract every service must satisfy
 
 - `Info()`: the first two bytes are the listen port, big-endian; the rest is
-  protocol-specific. The legacy session endpoint returns it raw to old clients.
+  protocol-specific. The legacy session endpoint returns it raw to old clients; that
+  endpoint is registered only with `[node] legacy_handshake = true`.
 - `GET /` answers the root document in the layout nodes on the network use (observed from
   a client): `{addr, uplink, downlink (bytes per second, as strings; "0" when the node has no
   usable measurement), handshake_dns,

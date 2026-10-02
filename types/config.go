@@ -166,6 +166,12 @@ remote_url = {{ toml .Node.RemoteURL }}
 # Type of node
 type = {{ toml .Node.Type }}
 
+# Also accept handshakes on the legacy endpoint POST /accounts/<address>/sessions/<id>,
+# which only old clients use. Its signature covers the session id alone, so a captured
+# request can be replayed with another key and cut the real client off. Leave it off
+# unless a client you serve still needs it.
+legacy_handshake = {{ .Node.LegacyHandshake }}
+
 [qos]
 # Limit max number of concurrent peers
 max_peers = {{ .QOS.MaxPeers }}
@@ -445,6 +451,7 @@ type NodeConfig struct {
 	HourlyPrices           string        `json:"hourly_prices" mapstructure:"hourly_prices"`
 	RemoteURL              string        `json:"remote_url" mapstructure:"remote_url"`
 	Type                   string        `json:"type" mapstructure:"type"`
+	LegacyHandshake        bool          `json:"legacy_handshake" mapstructure:"legacy_handshake"`
 }
 
 func NewNodeConfig() *NodeConfig {
@@ -534,6 +541,7 @@ func (c *NodeConfig) WithDefaultValues() *NodeConfig {
 	c.IntervalUpdateStatus = MaxIntervalUpdateStatus
 	c.ListenOn = fmt.Sprintf("0.0.0.0:%d", utils.RandomPort())
 	c.Type = "wireguard"
+	c.LegacyHandshake = false
 
 	return c
 }

@@ -318,9 +318,6 @@ func StartCmd() *cobra.Command {
 				)
 			)
 
-			router.Use(corsMiddleware)
-			api.RegisterRoutes(ctx, router)
-
 			ctx = ctx.WithBandwidth(&bw).
 				WithBandwidthSource(measured.Source).
 				WithClient(client).
@@ -330,6 +327,14 @@ func StartCmd() *cobra.Command {
 				WithLocation(location).
 				WithLogger(log).
 				WithService(service)
+
+			// The routes read the configuration, so they are registered once
+			// the context carries it.
+			router.Use(corsMiddleware)
+			api.RegisterRoutes(ctx, router)
+			if config.Node.LegacyHandshake {
+				log.Info("The legacy handshake endpoint is on: [node] legacy_handshake")
+			}
 
 			n := node.NewNode(ctx)
 			if err = n.Initialize(); err != nil {

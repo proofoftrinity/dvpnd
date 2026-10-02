@@ -16,6 +16,10 @@ func RegisterRoutes(ctx *context.Context, router gin.IRouter) {
 
 	// Current client apps handshake at the root path.
 	router.POST("/", requireTLS(), limit, HandlerHandshake(ctx))
-	// Legacy endpoint kept for older clients.
-	router.POST("/accounts/:acc_address/sessions/:id", requireTLS(), limit, HandlerAddSession(ctx))
+	// The legacy endpoint only when the operator turns it on: its signature
+	// covers the session id alone, so a captured request can be replayed
+	// with another peer key, which evicts the real client's peer.
+	if ctx.Config().Node.LegacyHandshake {
+		router.POST("/accounts/:acc_address/sessions/:id", requireTLS(), limit, HandlerAddSession(ctx))
+	}
 }
