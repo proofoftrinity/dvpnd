@@ -6,6 +6,7 @@ package cmd
 import (
 	"bufio"
 	gocontext "context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -18,9 +19,11 @@ import (
 	"syscall"
 	"time"
 
+	sdkmath "cosmossdk.io/math"
 	cmtlog "github.com/cometbft/cometbft/libs/log"
 	"github.com/cosmos/cosmos-sdk/client/flags"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	v1base "github.com/sentinel-official/sentinelhub/v12/types/v1"
@@ -66,6 +69,52 @@ func hnsdArgs(peers uint64, host net.IP) []string {
 		"--pool-size", strconv.FormatUint(peers, 10),
 		"--rs-host", net.JoinHostPort(host.String(), "53"),
 	}
+}
+
+// checkGrants refuses to start a hot-key node whose grants are missing or
+// expired, since its every transaction would fail, and logs what will run
+// out within lite.GrantWarningWindow.
+func checkGrants(log cmtlog.Logger, client *lite.Client, config *types.Config) error {
+	problems, warnings, err := client.CheckGrants(time.Now(), expectedFees(config, lite.GrantWarningWindow))
+	if err != nil {
+		return err
+	}
+	for _, w := range warnings {
+		log.Error("Renew the node's grants soon (dvpnd keys authz-commands)", "warning", w)
+	}
+	if len(problems) > 0 {
+		return fmt.Errorf("the hot key cannot act for the node account: %s; "+
+			"run \"dvpnd keys authz-commands\" and make the grants it prints from the node account's wallet",
+			strings.Join(problems, "; "))
+	}
+
+	return nil
+}
+
+// expectedFees is roughly what the node spends on fees over d: a status
+// update and a session report per interval, at the configured gas and price.
+func expectedFees(config *types.Config, d time.Duration) sdk.Coins {
+	prices, err := sdk.ParseDecCoins(config.Chain.GasPrices)
+	if err != nil {
+		return nil
+	}
+
+	var txs int64
+	for _, interval := range []time.Duration{config.Node.IntervalUpdateStatus, config.Node.IntervalUpdateSessions} {
+		if interval > 0 {
+			txs += int64(d / interval)
+		}
+	}
+	gas := sdkmath.LegacyNewDec(int64(config.Chain.Gas)).Mul(sdkmath.LegacyMustNewDecFromStr(
+		strconv.FormatFloat(config.Chain.GasAdjustment, 'f', -1, 64)))
+
+	var fees sdk.Coins
+	for _, price := range prices {
+		amount := price.Amount.Mul(gas).MulInt64(txs).Ceil().TruncateInt()
+		fees = fees.Add(sdk.NewCoin(price.Denom, amount))
+	}
+
+	return fees
 }
 
 // apiPort is the TCP port of the node API's listen address; zero when it
@@ -182,12 +231,34 @@ func StartCmd() *cobra.Command {
 				WithSimulateAndExecute(config.Chain.SimulateAndExecute).
 				WithTxTimeout(config.Chain.RPCTxTimeout)
 
+			if config.Keyring.Granter != "" {
+				granter, err := sdk.AccAddressFromBech32(config.Keyring.Granter)
+				if err != nil {
+					return err
+				}
+				if granter.Equals(client.FromAddress()) {
+					return errors.New("[keyring] granter is the signing key's own address; leave it empty")
+				}
+				client = client.WithGranter(granter)
+				log.Info("Signing with a hot key for the node account", "key", client.FromAddress(), "node_account", granter)
+			}
+
 			account, err := client.QueryAccount(client.FromAddress())
 			if err != nil {
 				return err
 			}
 			if account == nil {
+				if client.Granter() != nil {
+					return fmt.Errorf("account %s does not exist yet; the granter's fee grant creates it "+
+						"(dvpnd keys authz-commands)", client.FromAddress())
+				}
 				return fmt.Errorf("account does not exist with address %s", client.FromAddress())
+			}
+
+			if client.Granter() != nil {
+				if err = checkGrants(log, client, config); err != nil {
+					return err
+				}
 			}
 
 			// The chain deactivates a node, and cancels a session, whose last update

@@ -133,6 +133,12 @@ backend = {{ toml .Keyring.Backend }}
 # Name of the key with which to sign
 from = {{ toml .Keyring.From }}
 
+# The node account, when the key above is a hot key: the address (sent1...) that granted
+# it the right to send the node's messages (authz) and pays its fees (feegrant). The
+# operator key and the earnings then stay off this server. Empty: the key above is the
+# node account itself. "dvpnd keys authz-commands" prints the grants to make.
+granter = {{ toml .Keyring.Granter }}
+
 [node]
 # Time interval between each set_sessions operation
 interval_set_sessions = {{ toml .Node.IntervalSetSessions }}
@@ -413,6 +419,7 @@ func (c *HandshakeConfig) WithDefaultValues() *HandshakeConfig {
 type KeyringConfig struct {
 	Backend string `json:"backend" mapstructure:"backend"`
 	From    string `json:"from" mapstructure:"from"`
+	Granter string `json:"granter" mapstructure:"granter"`
 }
 
 func NewKeyringConfig() *KeyringConfig {
@@ -428,6 +435,11 @@ func (c *KeyringConfig) Validate() error {
 	}
 	if c.From == "" {
 		return errors.New("from cannot be empty")
+	}
+	if c.Granter != "" {
+		if _, err := sdk.AccAddressFromBech32(c.Granter); err != nil {
+			return errors.Wrap(err, "invalid granter")
+		}
 	}
 
 	return nil

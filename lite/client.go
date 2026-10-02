@@ -20,6 +20,7 @@ import (
 
 type Client struct {
 	ctx          client.Context
+	granter      sdk.AccAddress
 	log          cmtlog.Logger
 	mutex        *sync.Mutex
 	queryTimeout uint

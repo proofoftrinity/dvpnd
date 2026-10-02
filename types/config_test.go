@@ -216,3 +216,14 @@ func TestRPCAddressesNeedTLS(t *testing.T) {
 		}
 	}
 }
+
+func TestKeyringGranter(t *testing.T) {
+	c := NewKeyringConfig().WithDefaultValues()
+	if c.Granter != "" || c.Validate() != nil {
+		t.Fatal("no granter by default")
+	}
+	c.Granter = "not-an-address"
+	if err := c.Validate(); err == nil || !strings.Contains(err.Error(), "invalid granter") {
+		t.Fatalf("granter validation: %v", err)
+	}
+}

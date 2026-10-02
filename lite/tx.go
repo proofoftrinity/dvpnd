@@ -136,6 +136,9 @@ func (c *Client) PrepareTxFactory(messages ...sdk.Msg) (txf tx.Factory, err erro
 	txf = c.txf.
 		WithAccountNumber(acc.GetAccountNumber()).
 		WithSequence(acc.GetSequence())
+	if c.granter != nil {
+		txf = txf.WithFeeGranter(c.granter)
+	}
 
 	if c.SimulateAndExecute() {
 		gas, err := c.CalculateGas(txf, messages...)
@@ -183,6 +186,8 @@ func (c *Client) tx(messages ...sdk.Msg) (res *sdk.TxResponse, err error) {
 func (c *Client) Tx(messages ...sdk.Msg) (res *sdk.TxResponse, err error) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
+
+	messages = c.execMessages(messages)
 
 	err = retry.Do(
 		func() error {

@@ -12,6 +12,8 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/auth"
 	authtx "github.com/cosmos/cosmos-sdk/x/auth/tx"
 	authvesting "github.com/cosmos/cosmos-sdk/x/auth/vesting"
+	authzmodule "github.com/cosmos/cosmos-sdk/x/authz/module"
+	feegrantmodule "github.com/cosmos/cosmos-sdk/x/feegrant/module"
 	"github.com/sentinel-official/sentinelhub/v12/x/vpn"
 )
 
@@ -38,15 +40,18 @@ func NewEncodingConfig() EncodingConfig {
 	}
 }
 
-// DefaultEncodingConfig registers the auth and vesting account types plus every
-// Sentinel module interface (v1, v2 and v3) so that Any-typed query results such
-// as sessions can be unpacked.
+// DefaultEncodingConfig registers the auth and vesting account types, authz
+// and feegrant (a node that signs with a hot key sends MsgExec and reads its
+// grants), plus every Sentinel module interface (v1, v2 and v3) so that
+// Any-typed query results such as sessions can be unpacked.
 func DefaultEncodingConfig() EncodingConfig {
 	var (
 		cfg     = NewEncodingConfig()
 		modules = module.NewBasicManager(
 			auth.AppModuleBasic{},
 			authvesting.AppModuleBasic{},
+			authzmodule.AppModuleBasic{},
+			feegrantmodule.AppModuleBasic{},
 			vpn.AppModuleBasic{},
 		)
 	)

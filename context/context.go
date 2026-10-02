@@ -69,9 +69,19 @@ func (c *Context) ListenOn() string                    { return c.Config().Node.
 func (c *Context) Location() *geoiptypes.GeoIPLocation { return c.location }
 func (c *Context) Log() cmtlog.Logger                  { return c.logger }
 func (c *Context) Moniker() string                     { return c.Config().Node.Moniker }
-func (c *Context) Operator() sdk.AccAddress            { return c.client.FromAddress() }
-func (c *Context) RemoteURL() string                   { return c.Config().Node.RemoteURL }
-func (c *Context) Service() types.Service              { return c.service }
+
+// Operator is the node account: the granter when the node signs with a hot
+// key, the signing key's own account otherwise.
+func (c *Context) Operator() sdk.AccAddress {
+	if granter := c.client.Granter(); granter != nil {
+		return granter
+	}
+
+	return c.client.FromAddress()
+}
+
+func (c *Context) RemoteURL() string      { return c.Config().Node.RemoteURL }
+func (c *Context) Service() types.Service { return c.service }
 
 func (c *Context) IntervalUpdateSessions() time.Duration {
 	return c.Config().Node.IntervalUpdateSessions
