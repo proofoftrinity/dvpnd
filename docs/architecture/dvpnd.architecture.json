@@ -47,7 +47,7 @@
     ],
     "repository": {
       "url": "git@github.com:trinitystake/dvpnd.git",
-      "revision": "7ee8c48db0114b09b4f0316a7e4da4f80d4ba034",
+      "revision": "4e87a3dc185035d953b3ce0ec09eb43bf02aa1cb",
       "link_mode": "local-only"
     }
   },
@@ -145,6 +145,9 @@
         },
         {
           "path": "services/registry.go"
+        },
+        {
+          "path": "services/common/egress.go"
         }
       ]
     },
@@ -456,6 +459,7 @@
       "items": [
         "Clients pin the self-signed certificate; no CA involved",
         "Peers the database does not know are evicted every set_sessions tick",
+        "Clients reach the internet only: not the host, private or link-local networks, or port 25",
         "Runs as root in a systemd sandbox, or with the four capabilities the Dockerfile keeps",
         "No client IPs or peer keys in the log unless run at debug"
       ]
