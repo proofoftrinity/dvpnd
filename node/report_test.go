@@ -1,0 +1,253 @@
+// SPDX-License-Identifier: Apache-2.0
+
+package node
+
+import (
+	"errors"
+	"path/filepath"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
+	sdkmath "cosmossdk.io/math"
+	cmtlog "github.com/cometbft/cometbft/libs/log"
+	v1base "github.com/sentinel-official/sentinelhub/v12/types/v1"
+	nodetypes "github.com/sentinel-official/sentinelhub/v12/x/node/types/v3"
+	sessiontypes "github.com/sentinel-official/sentinelhub/v12/x/session/types/v3"
+	subscriptiontypes "github.com/sentinel-official/sentinelhub/v12/x/subscription/types/v3"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+	gormlogger "gorm.io/gorm/logger"
+
+	"github.com/trinitystake/dvpnd/v9/context"
+	"github.com/trinitystake/dvpnd/v9/types"
+)
+
+// fakeChain holds sessions by id and refuses a report that names a session
+// it does not hold as active, failing the whole transaction the way the
+// chain does.
+type fakeChain struct {
+	mu       sync.Mutex
+	sessions map[uint64]v1base.Status
+	down     bool       // every call fails, as in an RPC outage
+	sent     [][]uint64 // the ids of every report attempted
+	accepted []uint64
+}
+
+func (f *fakeChain) QuerySession(id uint64) (sessiontypes.Session, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.down {
+		return nil, errors.New("connection refused")
+	}
+	status, ok := f.sessions[id]
+	if !ok {
+		return nil, nil
+	}
+
+	return &nodetypes.Session{BaseSession: &sessiontypes.BaseSession{
+		ID: id, Status: status,
+		DownloadBytes: sdkmath.ZeroInt(), UploadBytes: sdkmath.ZeroInt(), MaxBytes: sdkmath.ZeroInt(),
+	}}, nil
+}
+
+func (f *fakeChain) QuerySubscription(uint64) (*subscriptiontypes.Subscription, error) {
+	return nil, nil
+}
+
+func (f *fakeChain) UpdateSessions(items ...types.Session) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var ids []uint64
+	for _, item := range items {
+		ids = append(ids, item.ID)
+	}
+	f.sent = append(f.sent, ids)
+	if f.down {
+		return errors.New("connection refused")
+	}
+	for _, id := range ids {
+		if status, ok := f.sessions[id]; !ok || status.Equal(v1base.StatusInactive) {
+			return errors.New("session not found")
+		}
+	}
+	f.accepted = append(f.accepted, ids...)
+
+	return nil
+}
+
+func testNode(chain *fakeChain) *Node {
+	n := NewNode(context.NewContext().WithLogger(cmtlog.NewNopLogger()))
+	n.chain = chain
+
+	return n
+}
+
+func sessions(ids ...uint64) []types.Session {
+	var items []types.Session
+	for _, id := range ids {
+		items = append(items, types.Session{ID: id, Key: "k"})
+	}
+
+	return items
+}
+
+// TestReportDropsASessionTheChainEnded: one session the chain deleted between
+// the query and the send no longer holds back the others' reports.
+func TestReportDropsASessionTheChainEnded(t *testing.T) {
+	chain := &fakeChain{sessions: map[uint64]v1base.Status{
+		1: v1base.StatusActive, 3: v1base.StatusInactivePending,
+	}}
+
+	if err := testNode(chain).reportSessions(sessions(1, 2, 3)); err != nil {
+		t.Fatal(err)
+	}
+	if got := chain.accepted; len(got) != 2 || got[0] != 1 || got[1] != 3 {
+		t.Fatalf("accepted %v, want [1 3]", got)
+	}
+	if len(chain.sent) != 2 {
+		t.Fatalf("sent %v: want the batch, then the batch without session 2", chain.sent)
+	}
+}
+
+// TestReportOneAtATime: when the second batch still fails, each session is
+// sent on its own and the good ones get through.
+func TestReportOneAtATime(t *testing.T) {
+	chain := &fakeChain{sessions: map[uint64]v1base.Status{1: v1base.StatusActive, 2: v1base.StatusActive}}
+	n := testNode(chain)
+	// Session 2 is reported active by the query but refused by the chain,
+	// as if it ended between the two.
+	n.chain = &refusing{fakeChain: chain, refuse: 2}
+
+	err := n.reportSessions(sessions(1, 2))
+	if err == nil || !strings.Contains(err.Error(), "session 2") {
+		t.Fatalf("err = %v", err)
+	}
+	if got := chain.accepted; len(got) != 1 || got[0] != 1 {
+		t.Fatalf("accepted %v, want [1]", got)
+	}
+}
+
+type refusing struct {
+	*fakeChain
+	refuse uint64
+}
+
+func (r *refusing) UpdateSessions(items ...types.Session) error {
+	for _, item := range items {
+		if item.ID == r.refuse {
+			r.mu.Lock()
+			r.sent = append(r.sent, []uint64{item.ID})
+			r.mu.Unlock()
+			return errors.New("session not found")
+		}
+	}
+
+	return r.fakeChain.UpdateSessions(items...)
+}
+
+// TestReportDuringAnOutage: with the chain unreachable the report is left
+// for the next pass, not sent session by session.
+func TestReportDuringAnOutage(t *testing.T) {
+	chain := &fakeChain{down: true, sessions: map[uint64]v1base.Status{}}
+
+	if err := testNode(chain).reportSessions(sessions(1, 2, 3)); err == nil {
+		t.Fatal("an outage must be reported")
+	}
+	if len(chain.sent) != 1 {
+		t.Fatalf("sent %v: one attempt, then wait for the next pass", chain.sent)
+	}
+}
+
+// TestJobPanicEndsTheNodeCleanly: a job that panics hands an error to the
+// node's error channel instead of crashing the process, so the caller still
+// stops the VPN service.
+func TestJobPanicEndsTheNodeCleanly(t *testing.T) {
+	n := testNode(&fakeChain{})
+	errCh := make(chan error, 1)
+
+	go n.runJob("boom", func() { panic("nil map") }, errCh)
+
+	select {
+	case err := <-errCh:
+		if !strings.Contains(err.Error(), "job boom panicked: nil map") {
+			t.Fatalf("err = %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("no error from a panicking job")
+	}
+}
+
+// peerSet is a VPN service that only keeps a set of peers.
+type peerSet struct {
+	types.Service
+	peers map[string]bool
+}
+
+func (p *peerSet) HasPeer(data []byte) bool { return p.peers[string(data)] }
+func (p *peerSet) RemovePeer(data []byte) error {
+	delete(p.peers, string(data))
+	return nil
+}
+
+// TestUpdateSessionsPass: a session the chain dropped loses its peer and its
+// row, a session the chain cannot be asked about waits for the next pass, and
+// the rest is reported, all in one pass that does not stop at the first
+// problem.
+func TestUpdateSessionsPass(t *testing.T) {
+	db := testDB(t)
+	// Keys are base64 of the peer data the service holds.
+	db.Create(&types.Session{ID: 1, Key: "YQ==", Address: "a", Upload: 10, Download: 10}) // "a"
+	db.Create(&types.Session{ID: 2, Key: "Yg==", Address: "b", Upload: 10, Download: 10}) // "b"
+	db.Create(&types.Session{ID: 3, Key: "Yw==", Address: "c", Upload: 10, Download: 10}) // "c"
+
+	service := &peerSet{peers: map[string]bool{"a": true, "b": true, "c": true}}
+	chain := &fakeChain{sessions: map[uint64]v1base.Status{1: v1base.StatusActive}}
+	n := NewNode(context.NewContext().WithLogger(cmtlog.NewNopLogger()).WithDatabase(db).WithService(service))
+	n.chain = &flaky{fakeChain: chain, fail: 3}
+
+	err := n.updateSessions()
+	if err == nil || !strings.Contains(err.Error(), "session 3") {
+		t.Fatalf("err = %v", err)
+	}
+	if got := chain.accepted; len(got) != 1 || got[0] != 1 {
+		t.Fatalf("reported %v, want [1]", got)
+	}
+	if service.peers["b"] || !service.peers["a"] || !service.peers["c"] {
+		t.Fatalf("peers %v: only the dropped session's peer goes", service.peers)
+	}
+	var ids []uint64
+	db.Model(&types.Session{}).Order("id").Pluck("id", &ids)
+	if len(ids) != 2 || ids[0] != 1 || ids[1] != 3 {
+		t.Fatalf("rows %v, want [1 3]", ids)
+	}
+}
+
+// flaky fails the session query for one id.
+type flaky struct {
+	*fakeChain
+	fail uint64
+}
+
+func (f *flaky) QuerySession(id uint64) (sessiontypes.Session, error) {
+	if id == f.fail {
+		return nil, errors.New("timeout")
+	}
+
+	return f.fakeChain.QuerySession(id)
+}
+
+func testDB(t *testing.T) *gorm.DB {
+	t.Helper()
+
+	db, err := gorm.Open(sqlite.Open(filepath.Join(t.TempDir(), "data.db")), &gorm.Config{Logger: gormlogger.Discard})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.AutoMigrate(&types.Session{}); err != nil {
+		t.Fatal(err)
+	}
+
+	return db
+}

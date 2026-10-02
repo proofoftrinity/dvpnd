@@ -345,9 +345,9 @@ func StartCmd() *cobra.Command {
 				return err
 			}
 
-			// Run until the API server fails or a stop signal arrives, then
-			// stop the VPN service so the tunnel interface, NAT rules or the
-			// proxy child process do not outlive the node.
+			// Run until the API server fails, a job panics or a stop signal
+			// arrives, then stop the VPN service so the tunnel interface, the
+			// firewall rules or the proxy child process do not outlive the node.
 			errCh := make(chan error, 1)
 			go func() { errCh <- n.Start(home) }()
 
@@ -359,7 +359,7 @@ func StartCmd() *cobra.Command {
 			case sig := <-sigCh:
 				log.Info("Stopping: signal received", "signal", sig.String())
 			case err = <-errCh:
-				log.Error("API server exited", "error", err)
+				log.Error("The node stopped on an error", "error", err)
 			}
 
 			log.Info("Stopping the VPN service", "type", service.Type())
