@@ -151,9 +151,11 @@ func (s *V2Ray) Init(home string) (err error) {
 }
 
 func (s *V2Ray) Start() (err error) {
+	// VMess runs with v2ray's default, AEAD headers only: the legacy
+	// header's MD5 authentication is weak, and current clients (alterId 0
+	// on a v2ray or xray core) send AEAD.
 	s.process, err = common.StartProcess(binaryName,
-		[]string{"run", "--config", s.configFilePath()},
-		[]string{"V2RAY_VMESS_AEAD_FORCED=false"})
+		[]string{"run", "--config", s.configFilePath()}, nil)
 
 	return err
 }

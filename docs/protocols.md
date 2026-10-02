@@ -121,7 +121,9 @@ PostUp accept rules, which stay as they are.
 with the node's certificate (pin advertised); peers and usage over the gRPC control API on
 loopback, on `[api] port` in `v2ray.toml` (it was fixed at 23 before the egress policy, and
 a port below 1024 needs root). Routing sends the egress policy to a blackhole with
-`domainStrategy: IPIfNonMatch`.
+`domainStrategy: IPIfNonMatch`. VMess accepts AEAD headers only, v2ray's default: clients
+use `alterId: 0` on a v2ray or xray core, which sends them (checked with Katacomb's settings
+against v2ray 5.47).
 
 ### XRAY (shipped)
 
