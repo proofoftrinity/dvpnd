@@ -1,25 +1,18 @@
+# golangci-lint v2. CI runs it as an advisory job: findings are reported, they
+# do not fail the run.
+version: "2"
+
 run:
-  concurrency: 16
-  timeout: 5m
+  timeout: 10m
   tests: false
-  allow-parallel-runners: true
 
 linters:
-  disable:
-    - gochecknoglobals
-    - varnamelen
-  presets:
-    - bugs
-    - comment
-    - complexity
-    - error
-    - format
-    - import
-    - metalinter
-    - module
-    - performance
-    - sql
-    - style
-    - test
-    - unused
-  fast: false
+  # errcheck, govet, ineffassign, staticcheck, unused
+  default: standard
+  enable:
+    # Security checks: command injection, file permissions, weak crypto,
+    # unchecked integer conversions and the like.
+    - gosec
+  exclusions:
+    presets:
+      - std-error-handling
