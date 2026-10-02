@@ -417,6 +417,21 @@ local name the commands below use:
 docker pull ghcr.io/trinitystake/dvpnd:latest && docker tag ghcr.io/trinitystake/dvpnd:latest dvpnd
 ```
 
+Images from releases after 9.3.2 are signed by that workflow, with no signing key anyone
+holds (Sigstore keyless), and carry their build provenance and an SBOM. Check one before you
+run it, with [cosign](https://docs.sigstore.dev/cosign/system_config/installation/) or the
+GitHub CLI:
+
+```sh
+cosign verify ghcr.io/trinitystake/dvpnd:latest \
+  --certificate-identity-regexp '^https://github.com/trinitystake/dvpnd/\.github/workflows/docker-publish\.yml@refs/tags/v' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+gh attestation verify oci://ghcr.io/trinitystake/dvpnd:latest --repo trinitystake/dvpnd
+```
+
+Both must succeed; a failure means the image was not built by this repository's release
+workflow.
+
 Or build it yourself (the Dockerfile uses BuildKit cache mounts, so BuildKit must be on — it
 is by default on current Docker; otherwise prefix the command with `DOCKER_BUILDKIT=1`):
 
