@@ -280,9 +280,16 @@ const ProxyChain = "DVPND-PROXY"
 // but they resolve a name once to match it and again to dial it, so a name
 // whose answer changes in between (DNS rebinding) could reach a blocked
 // address; the kernel sees only the address actually dialled. The chain
-// accepts replies, DNS to the host's resolvers, and the loopback ports the
-// daemon must reach (Hysteria's authentication hook), and rejects the
-// blocked networks and TCP port 25 unless allowed.
+// accepts replies, DNS to the host's resolvers, the loopback ports the daemon
+// must reach (Hysteria's authentication hook) and the node API port on the
+// host's own addresses. It rejects every other address of the host, which
+// the proxies cannot know (services bound to the public address that the
+// host's firewall keeps from the outside), the blocked networks, and TCP
+// port 25 unless allowed.
+//
+// DNS is matched on the destination the daemon asked for, before any address
+// translation: Docker's embedded resolver answers 127.0.0.11:53 through a
+// DNAT to another port.
 type ProxyEgress struct {
 	UID           uint32
 	LoopbackPorts []uint16
@@ -332,9 +339,15 @@ func (e ProxyEgress) chains(policy Egress) chains {
 					continue
 				}
 				for _, proto := range []string{"udp", "tcp"} {
-					rules = append(rules, []string{"-A", ProxyChain, "-d", ip.String(), "-p", proto, "--dport", "53", "-j", "ACCEPT"})
+					rules = append(rules, []string{"-A", ProxyChain, "-p", proto, "-m", "conntrack",
+						"--ctorigdst", ip.String(), "--ctorigdstport", "53", "-j", "ACCEPT"})
 				}
 			}
+			if policy.APIPort != 0 {
+				rules = append(rules, []string{"-A", ProxyChain, "-m", "addrtype", "--dst-type", "LOCAL",
+					"-p", "tcp", "--dport", strconv.Itoa(int(policy.APIPort)), "-j", "ACCEPT"})
+			}
+			rules = append(rules, []string{"-A", ProxyChain, "-m", "addrtype", "--dst-type", "LOCAL", "-j", "REJECT"})
 			for _, cidr := range f.blocked {
 				rules = append(rules, []string{"-A", ProxyChain, "-d", cidr, "-j", "REJECT"})
 			}

@@ -301,8 +301,11 @@ TCP port 25 unless `[egress] allow_smtp = true`. None of this depends on ufw.
 - On a host, where they run as `dvpnd-proxy` (§6), the kernel holds them to it too: the
   `DVPND-PROXY` chain in OUTPUT rejects whatever that account dials in a blocked network or
   on port 25, so even a name whose answer changes between the proxy's check and its dial
-  (DNS rebinding) cannot get through. It lets the account reach the resolvers in
-  `/etc/resolv.conf` and Hysteria2's authentication hook on loopback.
+  (DNS rebinding) cannot get through. It also rejects every address of the host itself
+  except the node API port, so a service bound to the public address that ufw keeps from
+  the outside is not reachable through a proxy either. It lets the account reach the
+  resolvers in `/etc/resolv.conf` (Docker's `127.0.0.11` included) and Hysteria2's
+  authentication hook on loopback.
 - WireGuard, AmneziaWG and OpenVPN enforce it with two iptables chains (and the same in
   ip6tables) per tunnel interface, jumped to from the top of FORWARD and INPUT:
   `DVPND-FWD-<interface>` and `DVPND-IN-<interface>`. From the tunnel the host accepts only

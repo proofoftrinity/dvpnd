@@ -89,7 +89,9 @@ key on; the name is what `GET /` reports as `service_type`.
   policy in `services/common/egress.go` (the blocked IPv4 and IPv6 networks, `localhost` by
   name, TCP 25 unless `[egress] allow_smtp`) is rendered by every service, so the protocols
   cannot drift apart. Proxies render it into their own configuration and must match a
-  destination given as a name by its resolved addresses too. Tunnel services install it with
+  destination given as a name by its resolved addresses too; run as the proxy account, they
+  are held to it, and kept off every address of the host but the API port, by
+  `common.ProxyEgress` in the kernel. Tunnel services install it with
   `common.TunnelEgress` (per-interface chains jumped to from the top of FORWARD and INPUT)
   before the interface carries traffic, and remove it after.
 

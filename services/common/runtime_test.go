@@ -12,7 +12,7 @@ import (
 
 func TestProxyEgress(t *testing.T) {
 	f := fakeIptables(t)
-	withEgress(t, Egress{})
+	withEgress(t, Egress{APIPort: 8585})
 
 	saved := resolvConf
 	resolvConf = filepath.Join(t.TempDir(), "resolv.conf")
@@ -38,13 +38,17 @@ func TestProxyEgress(t *testing.T) {
 			blocked = BlockedNetworksV4
 			want = append(want,
 				"-o lo -d 127.0.0.1 -p tcp --dport 41234 -j ACCEPT",
-				"-d 127.0.0.53 -p udp --dport 53 -j ACCEPT",
-				"-d 127.0.0.53 -p tcp --dport 53 -j ACCEPT")
+				"-p udp -m conntrack --ctorigdst 127.0.0.53 --ctorigdstport 53 -j ACCEPT",
+				"-p tcp -m conntrack --ctorigdst 127.0.0.53 --ctorigdstport 53 -j ACCEPT")
 		} else {
 			want = append(want,
-				"-d fe80::1 -p udp --dport 53 -j ACCEPT",
-				"-d fe80::1 -p tcp --dport 53 -j ACCEPT")
+				"-p udp -m conntrack --ctorigdst fe80::1 --ctorigdstport 53 -j ACCEPT",
+				"-p tcp -m conntrack --ctorigdst fe80::1 --ctorigdstport 53 -j ACCEPT")
 		}
+		// The host's own addresses: the API port, nothing else.
+		want = append(want,
+			"-m addrtype --dst-type LOCAL -p tcp --dport 8585 -j ACCEPT",
+			"-m addrtype --dst-type LOCAL -j REJECT")
 		for _, cidr := range blocked {
 			want = append(want, "-d "+cidr+" -j REJECT")
 		}
