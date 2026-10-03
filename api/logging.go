@@ -9,6 +9,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/version"
 	"github.com/gin-gonic/gin"
 
+	"github.com/trinitystake/dvpnd/v9/api/session"
 	"github.com/trinitystake/dvpnd/v9/context"
 	"github.com/trinitystake/dvpnd/v9/types"
 )
@@ -21,6 +22,15 @@ func serverHeader() gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 		c.Header("Server", value)
+		c.Next()
+	}
+}
+
+// replySigningHeader says on every response that the node signs its
+// handshake replies (session.ReplySigningHeader).
+func replySigningHeader() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Header(session.ReplySigningHeader, session.ReplySigningScheme)
 		c.Next()
 	}
 }

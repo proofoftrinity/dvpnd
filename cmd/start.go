@@ -403,9 +403,11 @@ func StartCmd() *cobra.Command {
 							types.ContentType,
 						},
 						// A client running in a browser must be able to
-						// read the reply's signature.
+						// read the reply's signature, and that the node
+						// signs.
 						ExposeHeaders: []string{
 							session.ReplySignatureHeader,
+							session.ReplySigningHeader,
 						},
 					},
 				)

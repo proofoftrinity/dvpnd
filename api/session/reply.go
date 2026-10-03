@@ -25,6 +25,17 @@ const ReplySignatureHeader = "X-Dvpnd-Signature"
 // signs (transactions, and in the future other node statements).
 const replyDomain = "dvpnd/handshake-reply/v1"
 
+// ReplySigningHeader is on every response of the node API, so a client can
+// tell from any request (the root document it reads before it pays for a
+// session) that this node signs its handshake replies, and with which scheme.
+// Someone on the network path can strip it as easily as the signature; a
+// client that requires signed replies then refuses the node before paying,
+// which costs nothing.
+const ReplySigningHeader = "X-Dvpnd-Reply-Signing"
+
+// ReplySigningScheme is ReplySigningHeader's value: the digest's domain.
+const ReplySigningScheme = replyDomain
+
 // replySigner signs with the node's signing key: the account the chain knows
 // the node by, or with authz a hot key the node account granted.
 type replySigner interface {

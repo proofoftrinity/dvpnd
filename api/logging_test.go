@@ -90,3 +90,26 @@ func TestServerHeader(t *testing.T) {
 		t.Fatalf("Server header: got %q, want dvpnd/1.2.3", got)
 	}
 }
+
+// TestReplySigningHeader: every response, a refusal and an unknown path
+// included, says that the node signs its handshake replies.
+func TestReplySigningHeader(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	r := gin.New()
+	r.Use(replySigningHeader())
+	r.GET("/", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"success": true}) })
+	r.POST("/", func(c *gin.Context) { c.JSON(http.StatusBadRequest, gin.H{"success": false}) })
+
+	for _, req := range []*http.Request{
+		httptest.NewRequest(http.MethodGet, "/", nil),
+		httptest.NewRequest(http.MethodPost, "/", nil),
+		httptest.NewRequest(http.MethodGet, "/nowhere", nil),
+	} {
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, req)
+		if got := rec.Header().Get("X-Dvpnd-Reply-Signing"); got != "dvpnd/handshake-reply/v1" {
+			t.Errorf("%s %s: X-Dvpnd-Reply-Signing %q", req.Method, req.URL.Path, got)
+		}
+	}
+}
