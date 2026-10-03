@@ -105,9 +105,15 @@ func runProxy(t *testing.T, pc proxyCase, allowSMTP bool) {
 	})
 
 	// The daemon runs as the proxy account, never as root.
-	procs := processes(t, pc.daemon, rt.Dir)
+	var procs map[int]int
+	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(100 * time.Millisecond) {
+		if procs = processes(t, pc.daemon, rt.Dir); len(procs) == 1 || time.Now().After(deadline) {
+			break
+		}
+	}
 	if len(procs) != 1 {
-		t.Fatalf("want one %s daemon reading from %s, found %v", pc.daemon, rt.Dir, procs)
+		out, _ := exec.Command("ps", "-eo", "pid,user,stat,comm,args").CombinedOutput()
+		t.Fatalf("want one %s daemon reading from %s, found %v\n%s", pc.daemon, rt.Dir, procs, out)
 	}
 	for pid, uid := range procs {
 		if uid != int(rt.Proxy.UID) {
