@@ -20,10 +20,25 @@ jobs:
         with:
           go-version-file: go.mod
       - run: go build ./...
-      - run: go vet ./...
-      - run: go test -race ./...
+      # The regression gate every change passes (test/README.md).
+      - run: make check
       - run: make build
       - run: ./bin/dvpnd --help | head -3
+
+  integration:
+    name: Integration suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      # Every protocol with its real daemon and a real client, in containers
+      # (test/README.md). The WireGuard server uses the kernel module.
+      - run: sudo modprobe wireguard
+      - run: make check-integration
 
   docker:
     name: Docker image

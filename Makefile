@@ -14,6 +14,34 @@ LD_FLAGS := -s -w \
 check-architecture:
 	@bash scripts/check-architecture-doc.sh
 
+# The regression gate (test/README.md): every change passes it before it is
+# committed. Formatting, vet (the integration tests included), every unit test
+# with the race detector, SPDX headers, the licence rule and the provenance
+# record. No network, no root, no Docker.
+GO_FILES = $$(git ls-files --cached --others --exclude-standard '*.go')
+.PHONY: check
+check:
+	@unformatted=$$(gofmt -l $(GO_FILES)); \
+	  [ -z "$$unformatted" ] || { echo "gofmt: not formatted:"; echo "$$unformatted"; exit 1; }
+	go vet ./...
+	go vet -tags integration ./test/integration/
+	go test -race -count=1 ./...
+	@missing=$$(grep -L 'SPDX-License-Identifier: Apache-2.0' $(GO_FILES)); \
+	  [ -z "$$missing" ] || { echo "missing SPDX header:"; echo "$$missing"; exit 1; }
+	@! grep -q 'sentinel-official/sentinel-go-sdk' go.mod go.sum || \
+	  { echo "sentinel-go-sdk carries no licence and must not be a dependency"; exit 1; }
+	@out=$$(bash docs/provenance/verify-fork.sh 2>&1) || { echo "$$out"; exit 1; }; echo "$$out" | tail -1
+
+# The integration suite (test/README.md): every protocol with its
+# real daemon and a real client, in Docker. Run it for any change to a service,
+# the egress policy, the runtime, the Dockerfile, the runner or the unit.
+.PHONY: check-integration
+check-integration:
+	@bash test/integration/run.sh
+
+.PHONY: check-all
+check-all: check check-integration
+
 .PHONY: benchmark
 benchmark:
 	@go test -bench -mod=readonly -v ./...

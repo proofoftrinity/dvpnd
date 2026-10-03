@@ -48,7 +48,9 @@ after that point under a non-open-source license. To keep this codebase clean:
 
 ## Practical
 
-- `make build` / `make test` / `make go-lint` before opening a pull request.
+- `make check` before every commit, and `make check-integration` (Docker) for a change
+  to a service, the egress policy, packaging or the systemd unit (`test/README.md`). A
+  bug fix comes with a test that fails without it.
 - Keep pull requests focused; one logical change per PR.
 - Bug reports and feature requests go through GitHub issues; security issues
   do not — see `SECURITY.md`.
