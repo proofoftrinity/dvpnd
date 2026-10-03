@@ -422,7 +422,8 @@ docker pull ghcr.io/trinitystake/dvpnd:latest && docker tag ghcr.io/trinitystake
 
 Images from 9.4.0 on are signed by that workflow, with no signing key anyone
 holds (Sigstore keyless), and carry their build provenance and an SBOM. Check one before you
-run it, with [cosign](https://docs.sigstore.dev/cosign/system_config/installation/) or the
+run it, with [cosign](https://docs.sigstore.dev/cosign/system_config/installation/) 3 or
+later (cosign 2 cannot read the signature format and answers "no signatures found") or the
 GitHub CLI:
 
 ```sh
