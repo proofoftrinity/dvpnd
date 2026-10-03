@@ -193,6 +193,10 @@ func (s *XRay) clientConn() (*grpc.ClientConn, error) {
 	conn, err := grpc.NewClient(
 		fmt.Sprintf("127.0.0.1:%d", s.config.API.Port),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		// A call waits, up to its deadline, for the proxy to accept
+		// connections instead of failing at once: right after Start, or
+		// while the proxy restarts.
+		grpc.WithDefaultCallOptions(grpc.WaitForReady(true)),
 	)
 	if err != nil {
 		return nil, err

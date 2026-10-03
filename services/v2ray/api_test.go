@@ -173,3 +173,63 @@ func TestAPICallsAreBounded(t *testing.T) {
 		t.Fatalf("AddPeer took %s", elapsed)
 	}
 }
+
+// TestAPICallWaitsForTheProxy: a call made while the proxy is still starting
+// (a handshake right after the node starts) waits for its API, within
+// rpcTimeout, instead of failing at once; with no proxy at all it fails at
+// rpcTimeout.
+func TestAPICallWaitsForTheProxy(t *testing.T) {
+	saved := rpcTimeout
+	rpcTimeout = 3 * time.Second
+	t.Cleanup(func() { rpcTimeout = saved })
+
+	lis, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	port := lis.Addr().(*net.TCPAddr).Port
+	_ = lis.Close()
+
+	s := NewV2Ray()
+	s.config = v2raytypes.NewConfig().WithDefaultValues()
+	s.config.API.Port = uint16(port)
+	t.Cleanup(func() {
+		if s.conn != nil {
+			_ = s.conn.Close()
+		}
+	})
+
+	api := &fakeAPI{users: map[string]bool{}, stats: map[string]int64{}}
+	srv := grpc.NewServer()
+	proxymancommand.RegisterHandlerServiceServer(srv, api)
+	t.Cleanup(srv.Stop)
+	go func() {
+		time.Sleep(300 * time.Millisecond)
+		lis, err := net.Listen("tcp", lis.Addr().String())
+		if err != nil {
+			return
+		}
+		_ = srv.Serve(lis)
+	}()
+
+	if _, err := s.AddPeer(append([]byte{0x01}, []byte("0123456789abcdef")...)); err != nil {
+		t.Fatalf("AddPeer while the proxy starts: %v", err)
+	}
+
+	rpcTimeout = 300 * time.Millisecond
+	idle := NewV2Ray()
+	idle.config = v2raytypes.NewConfig().WithDefaultValues()
+	idle.config.API.Port = uint16(port + 1)
+	t.Cleanup(func() {
+		if idle.conn != nil {
+			_ = idle.conn.Close()
+		}
+	})
+	start := time.Now()
+	if _, err := idle.AddPeer(append([]byte{0x01}, []byte("0123456789abcdef")...)); err == nil {
+		t.Fatal("AddPeer with no proxy succeeded")
+	}
+	if elapsed := time.Since(start); elapsed > 3*time.Second {
+		t.Fatalf("AddPeer with no proxy took %s", elapsed)
+	}
+}
