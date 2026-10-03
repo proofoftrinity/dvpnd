@@ -47,6 +47,8 @@ func TestProxyAccountChain(t *testing.T) {
 		{net.JoinHostPort(env.private, strconv.Itoa(targetPort)), false},
 		{net.JoinHostPort(env.self, strconv.Itoa(hostPort)), false},
 		{net.JoinHostPort("127.0.0.1", strconv.Itoa(hostPort)), false},
+		// The API is open on the host's public address only.
+		{net.JoinHostPort("127.0.0.1", strconv.Itoa(apiPort)), false},
 		{net.JoinHostPort("rebind.test", strconv.Itoa(hostPort)), false},
 	}
 

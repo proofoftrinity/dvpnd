@@ -265,6 +265,7 @@ func clientView(allowSMTP bool) []reach {
 		{net.JoinHostPort(env.private, strconv.Itoa(targetPort)), false},
 		{net.JoinHostPort(env.self, strconv.Itoa(hostPort)), false},
 		{net.JoinHostPort("127.0.0.1", strconv.Itoa(hostPort)), false},
+		{net.JoinHostPort("127.0.0.1", strconv.Itoa(apiPort)), false},
 		{net.JoinHostPort("::1", strconv.Itoa(hostPort)), false},
 		{net.JoinHostPort("localhost", strconv.Itoa(hostPort)), false},
 		{net.JoinHostPort("rebind.test", strconv.Itoa(hostPort)), false},

@@ -45,13 +45,14 @@ func TestProxyEgress(t *testing.T) {
 				"-p udp -m conntrack --ctorigdst fe80::1 --ctorigdstport 53 -j ACCEPT",
 				"-p tcp -m conntrack --ctorigdst fe80::1 --ctorigdstport 53 -j ACCEPT")
 		}
-		// The host's own addresses: the API port, nothing else.
-		want = append(want,
-			"-m addrtype --dst-type LOCAL -p tcp --dport 8585 -j ACCEPT",
-			"-m addrtype --dst-type LOCAL -j REJECT")
 		for _, cidr := range blocked {
 			want = append(want, "-d "+cidr+" -j REJECT")
 		}
+		// The host's own addresses, after the blocked networks (loopback
+		// among them): the API port, nothing else.
+		want = append(want,
+			"-m addrtype --dst-type LOCAL -p tcp --dport 8585 -j ACCEPT",
+			"-m addrtype --dst-type LOCAL -j REJECT")
 		want = append(want, "-p tcp --dport 25 -j REJECT")
 		if got := f.chains[tool][ProxyChain]; !slices.Equal(got, want) {
 			t.Fatalf("%s chain:\n%s\nwant:\n%s", tool, strings.Join(got, "\n"), strings.Join(want, "\n"))

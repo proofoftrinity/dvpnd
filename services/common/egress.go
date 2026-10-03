@@ -282,7 +282,7 @@ const ProxyChain = "DVPND-PROXY"
 // address; the kernel sees only the address actually dialled. The chain
 // accepts replies, DNS to the host's resolvers, the loopback ports the daemon
 // must reach (Hysteria's authentication hook) and the node API port on the
-// host's own addresses. It rejects every other address of the host, which
+// host's public addresses. It rejects every other address of the host, which
 // the proxies cannot know (services bound to the public address that the
 // host's firewall keeps from the outside), the blocked networks, and TCP
 // port 25 unless allowed.
@@ -343,14 +343,16 @@ func (e ProxyEgress) chains(policy Egress) chains {
 						"--ctorigdst", ip.String(), "--ctorigdstport", "53", "-j", "ACCEPT"})
 				}
 			}
+			// The blocked networks first, so the API port below is open on
+			// the host's public addresses only, never on loopback.
+			for _, cidr := range f.blocked {
+				rules = append(rules, []string{"-A", ProxyChain, "-d", cidr, "-j", "REJECT"})
+			}
 			if policy.APIPort != 0 {
 				rules = append(rules, []string{"-A", ProxyChain, "-m", "addrtype", "--dst-type", "LOCAL",
 					"-p", "tcp", "--dport", strconv.Itoa(int(policy.APIPort)), "-j", "ACCEPT"})
 			}
 			rules = append(rules, []string{"-A", ProxyChain, "-m", "addrtype", "--dst-type", "LOCAL", "-j", "REJECT"})
-			for _, cidr := range f.blocked {
-				rules = append(rules, []string{"-A", ProxyChain, "-d", cidr, "-j", "REJECT"})
-			}
 			if !policy.AllowSMTP {
 				rules = append(rules, []string{"-A", ProxyChain, "-p", "tcp", "--dport", strconv.Itoa(SMTPPort), "-j", "REJECT"})
 			}
