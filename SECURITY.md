@@ -15,7 +15,7 @@ steps, and impact. You will get an acknowledgement within a few days.
 
 Only the `main` branch and the latest tagged release receive fixes. Release tags
 are SSH-signed by the maintainer, and the installer builds only a tag whose
-signature verifies. From the first release after 9.3.2, release images on ghcr.io
+signature verifies. From 9.4.0, release images on ghcr.io
 are signed keylessly by the release workflow and carry build provenance and an
 SBOM (`docs/operator.md`, section 7).
 
