@@ -17,9 +17,12 @@ import (
 	"bufio"
 	"bytes"
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/tls"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -31,6 +34,7 @@ import (
 
 	cmtlog "github.com/cometbft/cometbft/libs/log"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
+	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	base "github.com/sentinel-official/sentinelhub/v12/types"
 	v1base "github.com/sentinel-official/sentinelhub/v12/types/v1"
@@ -226,6 +230,12 @@ func run(home, api string, gigabytes int64, maxPriceStr string, sessionID uint64
 	if err != nil {
 		return err
 	}
+	signer, err := checkReplySignature(resp.Header.Get("X-Dvpnd-Signature"), sessionID, peerJSON, dataJSON,
+		envelope.Result.Addrs, nodeAddr)
+	if err != nil {
+		return fmt.Errorf("reply signature (X-Dvpnd-Signature): %w", err)
+	}
+	fmt.Printf("reply signature: valid, signed by %s\n", signer)
 
 	if nodeType == "amneziawg" {
 		return writeAmneziaWGConfig(dataJSON, wgKey, envelope.Result.Addrs, home, out, endpoint, fullTunnel)
@@ -429,4 +439,57 @@ func writeAmneziaWGConfig(dataJSON []byte, wgKey *wgtypes.Key, hosts []string, h
 	fmt.Printf("next (as root): awg-quick up %s && sleep 20 && awg show && awg-quick down %s\n", out, out)
 
 	return nil
+}
+
+// checkReplySignature verifies the node's signature over a handshake reply
+// (docs/protocols.md, X-Dvpnd-Signature). It is written from the spec, not
+// with the node's code, so the two check each other. It returns who signed:
+// the node account, or a hot key, which a client must also find granted by
+// the node account on the chain.
+func checkReplySignature(header string, id uint64, request, reply []byte, addrs []string, node base.NodeAddress) (string, error) {
+	rest, ok := strings.CutPrefix(header, "secp256k1:")
+	if !ok {
+		return "", fmt.Errorf("missing or not a secp256k1 signature: %q", header)
+	}
+	keyB64, sigB64, ok := strings.Cut(rest, ";")
+	if !ok {
+		return "", fmt.Errorf("malformed: %q", header)
+	}
+	key, err := base64.StdEncoding.DecodeString(keyB64)
+	if err != nil || len(key) != 33 {
+		return "", fmt.Errorf("public key: %d bytes, %v", len(key), err)
+	}
+	sig, err := base64.StdEncoding.DecodeString(sigB64)
+	if err != nil || len(sig) != 64 {
+		return "", fmt.Errorf("signature: %d bytes, %v", len(sig), err)
+	}
+
+	digest := replyDigest(id, request, reply, addrs)
+	pub := &secp256k1.PubKey{Key: key}
+	if !pub.VerifySignature(digest, sig) {
+		return "", errors.New("does not verify over this request and reply")
+	}
+
+	signer := sdk.AccAddress(pub.Address())
+	if bytes.Equal(signer, node.Bytes()) {
+		return "the node account", nil
+	}
+
+	return "hot key " + signer.String() + " (valid only with the node account's authz grant)", nil
+}
+
+// replyDigest is SHA-256( "dvpnd/handshake-reply/v1" || BE64(id) ||
+// SHA-256(request) || SHA-256(reply) || addrs joined by "\n" ).
+func replyDigest(id uint64, request, reply []byte, addrs []string) []byte {
+	requestHash := sha256.Sum256(request)
+	replyHash := sha256.Sum256(reply)
+
+	msg := []byte("dvpnd/handshake-reply/v1")
+	msg = binary.BigEndian.AppendUint64(msg, id)
+	msg = append(msg, requestHash[:]...)
+	msg = append(msg, replyHash[:]...)
+	msg = append(msg, strings.Join(addrs, "\n")...)
+	digest := sha256.Sum256(msg)
+
+	return digest[:]
 }

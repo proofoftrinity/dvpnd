@@ -4,6 +4,7 @@ package session
 
 import (
 	"encoding/base64"
+	"encoding/hex"
 	"strings"
 	"testing"
 
@@ -105,4 +106,17 @@ func signerPubKey(t *testing.T, c *lite.Client) ([]byte, error) {
 	}
 
 	return pub.Bytes(), nil
+}
+
+// TestReplyDigestVector pins the signed digest to the bytes docs/protocols.md
+// specifies, computed outside Go: clients verify against the spec, so any
+// change to the digest breaks every client that checks it. tools/e2e checks
+// the same vector with its own implementation.
+func TestReplyDigestVector(t *testing.T) {
+	got := replyDigest(42, []byte(`{"public_key":"abc"}`),
+		[]byte(`{"addrs":["10.8.0.2/32"],"metadata":[{"port":51820}]}`),
+		[]string{"203.0.113.1", "node.example"})
+	if want := "8146f1e4b375b1e9ff799ccc91dc8304678a645c5e35b94575d33edd6d364882"; hex.EncodeToString(got) != want {
+		t.Fatalf("digest %x, want %s", got, want)
+	}
 }
