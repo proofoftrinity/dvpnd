@@ -3,6 +3,7 @@
 package lite
 
 import (
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -139,5 +140,21 @@ func TestHotKeyTransactions(t *testing.T) {
 	}
 	if _, err := c.TxConfig().TxEncoder()(txb.GetTx()); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// TestNoAuthorization: the chain answers a Grants query for a missing grant
+// with an error, which must read as "no grant" so the node names the grant to
+// make instead of failing on what looks like an RPC fault.
+func TestNoAuthorization(t *testing.T) {
+	mainnet := errors.New("rpc error: code = Unknown desc = authorization not found for " +
+		"/sentinel.node.v3.MsgUpdateNodeStatusRequest type: authorization not found: unknown request")
+	if !noAuthorization(mainnet) {
+		t.Fatal("the chain's answer for a missing grant is not read as no grant")
+	}
+	for _, err := range []error{nil, errors.New("rpc error: code = Unavailable desc = connection refused")} {
+		if noAuthorization(err) {
+			t.Fatalf("%v read as no grant", err)
+		}
 	}
 }

@@ -4,6 +4,7 @@ package lite
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/cosmos/cosmos-sdk/client"
@@ -51,6 +52,9 @@ func (c *Client) QueryGrantExpiry(granter, grantee sdk.AccAddress, msgTypeURL st
 			context.TODO(),
 			&authz.QueryGrantsRequest{Granter: granter.String(), Grantee: grantee.String(), MsgTypeUrl: msgTypeURL},
 		)
+		if noAuthorization(err) {
+			return nil
+		}
 		if err != nil {
 			return types.QueryError(err)
 		}
@@ -62,6 +66,15 @@ func (c *Client) QueryGrantExpiry(granter, grantee sdk.AccAddress, msgTypeURL st
 	})
 
 	return found, expiry, err
+}
+
+// noAuthorization reports the chain's answer to a Grants query for a message
+// type with no grant: an error, not an empty list, and with code Unknown rather
+// than NotFound (authz.ErrNoAuthorizationFound carries no gRPC code). Seen on
+// mainnet: "rpc error: code = Unknown desc = authorization not found for
+// <type> type: authorization not found: unknown request".
+func noAuthorization(err error) bool {
+	return err != nil && strings.Contains(err.Error(), authz.ErrNoAuthorizationFound.Error())
 }
 
 // QueryFeeAllowance returns the fee allowance granter gave grantee, or nil.
