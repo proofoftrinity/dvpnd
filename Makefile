@@ -18,7 +18,8 @@ check-architecture:
 # committed. The rule registry (every rule in docs/invariants/ pinned by a test
 # or excused in invariants/status.json), formatting, vet (the integration
 # tests included), every unit test with the race detector, SPDX headers, the
-# licence rule and the provenance record. No network, no root, no Docker.
+# licence rule and the provenance record. No root, no Docker; the provenance
+# script asks a few public archives when it can reach them.
 GO_FILES = $$(git ls-files --cached --others --exclude-standard '*.go')
 .PHONY: check
 check:

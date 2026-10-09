@@ -57,3 +57,6 @@ them.
   names, the daemon's control API, or a mail relay unless mail is allowed. The blocks
   must come from the node: a control step shows that the same destinations are reachable
   without the node's rules.
+- **[EG-13] Every protocol in the registry is a case of the integration suite.** A
+  protocol added to `services/registry.go` without one would ship with [EG-12] never
+  checked for it.

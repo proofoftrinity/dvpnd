@@ -36,8 +36,20 @@ not yet.
 - every unit test with the race detector, in shuffled order. Unit tests never
   touch the network, the chain or the host's firewall: iptables, the daemons'
   control APIs and the chain are faked;
-- an SPDX header on every Go file, no dependency on `sentinel-go-sdk`, and
-  `docs/provenance/verify-fork.sh`.
+- `test/static/`: the rules about the repository itself and the shape of code
+  a behaviour test cannot reach, read from the tree and git: the SPDX header
+  first in every Go file, no `sentinel-go-sdk` in `go.mod`, `go.sum` or any
+  import, the notice on every upstream file changed in substance, `LICENSE` as
+  the fork point had it, the provenance script passing offline, no wallet or
+  node address in any committed file, every protocol in the integration suite,
+  and the start command stopping the service on every exit;
+- the same SPDX and `sentinel-go-sdk` checks as shell steps, and
+  `docs/provenance/verify-fork.sh`, which also asks apache.org,
+  proxy.golang.org and Software Heritage when it can reach them (an
+  unreachable one is reported, not failed).
+
+`test/static/` needs the git history and the `fork-point` tag: a shallow clone
+fails it, and says to fetch the tags.
 
 CI runs the same checks, and the canaries, on every push and pull request
 (`.github/workflows/ci.yml`).

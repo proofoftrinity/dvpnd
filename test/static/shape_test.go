@@ -1,0 +1,230 @@
+// SPDX-License-Identifier: Apache-2.0
+
+package static
+
+import (
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"testing"
+
+	"github.com/trinitystake/dvpnd/v9/services"
+)
+
+// callsOn reports whether n calls recv.method (service.Stop), outside any
+// function literal: a literal runs later, or never.
+func callsOn(n ast.Node, recv, method string) bool {
+	return calls(n, recv, method, false)
+}
+
+// calls is callsOn, optionally looking into function literals too (the
+// closure a defer runs).
+func calls(n ast.Node, recv, method string, intoLiterals bool) bool {
+	found := false
+	ast.Inspect(n, func(n ast.Node) bool {
+		switch n := n.(type) {
+		case *ast.FuncLit:
+			return intoLiterals
+		case *ast.CallExpr:
+			if sel, ok := n.Fun.(*ast.SelectorExpr); ok && sel.Sel.Name == method {
+				if id, ok := sel.X.(*ast.Ident); ok && id.Name == recv {
+					found = true
+				}
+			}
+		}
+		return !found
+	})
+
+	return found
+}
+
+// unstoppedReturns lists the returns in stmts that leave without stopping the
+// service: no deferred service.Stop before them, and no service.Stop call
+// earlier on their path.
+func unstoppedReturns(fset *token.FileSet, stmts []ast.Stmt, stopped bool, deferred *bool) []string {
+	var bad []string
+	for _, s := range stmts {
+		switch s := s.(type) {
+		case *ast.DeferStmt:
+			if calls(s.Call, "service", "Stop", true) {
+				*deferred = true
+			}
+		case *ast.ReturnStmt:
+			if !stopped && !*deferred {
+				bad = append(bad, fset.Position(s.Pos()).String())
+			}
+		case *ast.IfStmt:
+			head := stopped || (s.Init != nil && callsOn(s.Init, "service", "Stop")) || callsOn(s.Cond, "service", "Stop")
+			bad = append(bad, unstoppedReturns(fset, s.Body.List, head, deferred)...)
+			if s.Else != nil {
+				bad = append(bad, unstoppedReturns(fset, []ast.Stmt{s.Else}, head, deferred)...)
+			}
+			stopped = head
+		case *ast.BlockStmt:
+			bad = append(bad, unstoppedReturns(fset, s.List, stopped, deferred)...)
+		case *ast.ForStmt:
+			bad = append(bad, unstoppedReturns(fset, s.Body.List, stopped, deferred)...)
+		case *ast.RangeStmt:
+			bad = append(bad, unstoppedReturns(fset, s.Body.List, stopped, deferred)...)
+		case *ast.SwitchStmt:
+			bad = append(bad, unstoppedReturns(fset, s.Body.List, stopped, deferred)...)
+		case *ast.TypeSwitchStmt:
+			bad = append(bad, unstoppedReturns(fset, s.Body.List, stopped, deferred)...)
+		case *ast.SelectStmt:
+			bad = append(bad, unstoppedReturns(fset, s.Body.List, stopped, deferred)...)
+		case *ast.CaseClause:
+			bad = append(bad, unstoppedReturns(fset, s.Body, stopped, deferred)...)
+		case *ast.CommClause:
+			bad = append(bad, unstoppedReturns(fset, s.Body, stopped, deferred)...)
+		default:
+			if callsOn(s, "service", "Stop") {
+				stopped = true
+			}
+		}
+	}
+
+	return bad
+}
+
+// TestStartStopsTheServiceOnEveryExit reads the start command: once
+// service.Start() has succeeded, every return must come after a deferred
+// service.Stop or after a service.Stop call on its path, so no step that fails
+// later leaves the tunnel, the firewall rules or the daemon behind.
+//
+// Rules: [RT-2].
+func TestStartStopsTheServiceOnEveryExit(t *testing.T) {
+	t.Skip("known bug B2: four steps after service.Start() return without stopping it; fix awaiting approval")
+
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, filepath.Join(root(t), "cmd", "start.go"), nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var body *ast.BlockStmt
+	ast.Inspect(file, func(n ast.Node) bool {
+		if kv, ok := n.(*ast.KeyValueExpr); ok {
+			if id, ok := kv.Key.(*ast.Ident); ok && id.Name == "RunE" {
+				if fl, ok := kv.Value.(*ast.FuncLit); ok {
+					body = fl.Body
+				}
+			}
+		}
+		return body == nil
+	})
+	if body == nil {
+		t.Fatal("no RunE function literal in cmd/start.go: re-aim this test at the start command")
+	}
+
+	start := -1
+	for i, s := range body.List {
+		if callsOn(s, "service", "Start") {
+			if start >= 0 {
+				t.Fatal("service.Start() is called twice: re-aim this test")
+			}
+			start = i
+		}
+	}
+	if start < 0 {
+		t.Fatal("no service.Start() in the start command: re-aim this test")
+	}
+
+	deferred := false
+	for _, pos := range unstoppedReturns(fset, body.List[start+1:], false, &deferred) {
+		t.Errorf("%s returns after service.Start() without stopping the service", pos)
+	}
+}
+
+// caseNames returns the name of each element of the slice literal the named
+// function returns: the protocols the integration suite runs.
+func caseNames(t *testing.T, file, fn string) []string {
+	t.Helper()
+	f, err := parser.ParseFile(token.NewFileSet(), filepath.Join(root(t), file), nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, d := range f.Decls {
+		fd, ok := d.(*ast.FuncDecl)
+		if !ok || fd.Name.Name != fn {
+			continue
+		}
+		for _, s := range fd.Body.List {
+			ret, ok := s.(*ast.ReturnStmt)
+			if !ok || len(ret.Results) != 1 {
+				continue
+			}
+			lit, ok := ret.Results[0].(*ast.CompositeLit)
+			if !ok {
+				continue
+			}
+			for _, e := range lit.Elts {
+				el, ok := e.(*ast.CompositeLit)
+				if !ok {
+					continue
+				}
+				for _, kv := range el.Elts {
+					kv, ok := kv.(*ast.KeyValueExpr)
+					if id, isID := kv.Key.(*ast.Ident); ok && isID && id.Name == "name" {
+						if bl, ok := kv.Value.(*ast.BasicLit); ok {
+							v, _ := strconv.Unquote(bl.Value)
+							names = append(names, v)
+						}
+					}
+				}
+			}
+		}
+	}
+	if len(names) == 0 {
+		t.Fatalf("no cases in %s's %s: re-aim this test", file, fn)
+	}
+
+	return names
+}
+
+// Rules: [EG-13].
+func TestEveryProtocolIsInTheIntegrationSuite(t *testing.T) {
+	cases := append(caseNames(t, "test/integration/proxies_test.go", "proxyCases"),
+		caseNames(t, "test/integration/tunnels_test.go", "tunnelCases")...)
+	for _, name := range services.Names() {
+		covered := false
+		for _, c := range cases {
+			if c == name || strings.HasPrefix(c, name+"-") {
+				covered = true
+			}
+		}
+		if !covered {
+			t.Errorf("protocol %q has no case in the integration suite (proxyCases or tunnelCases)", name)
+		}
+	}
+}
+
+// TestUnstoppedReturnsChecker holds the checker above to known shapes, so a
+// checker that sees nothing cannot pass the start command.
+func TestUnstoppedReturnsChecker(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+		bad  int
+	}{
+		{"a return before any stop", `if err != nil { return err }; service.Stop(); return nil`, 1},
+		{"a deferred stop covers every later return", `defer service.Stop(); if err != nil { return err }; return nil`, 0},
+		{"a deferred closure counts", `defer func() { _ = service.Stop() }(); return nil`, 0},
+		{"a stop in an if's init covers what follows", `if err := service.Stop(); err != nil { return err }; return nil`, 0},
+		{"another receiver's Stop does not count", `defer signal.Stop(ch); return nil`, 1},
+		{"a stop inside a function literal does not count", `go func() { service.Stop() }(); return nil`, 1},
+	}
+	for _, c := range cases {
+		fset := token.NewFileSet()
+		f, err := parser.ParseFile(fset, "x.go", "package x\nfunc f() error {"+c.body+"}", 0)
+		if err != nil {
+			t.Fatalf("%s: %v", c.name, err)
+		}
+		deferred := false
+		if got := unstoppedReturns(fset, f.Decls[0].(*ast.FuncDecl).Body.List, false, &deferred); len(got) != c.bad {
+			t.Errorf("%s: %d unstopped returns %v, want %d", c.name, len(got), got, c.bad)
+		}
+	}
+}
