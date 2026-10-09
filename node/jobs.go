@@ -6,6 +6,7 @@ package node
 import (
 	"errors"
 	"fmt"
+	"runtime/debug"
 	"time"
 
 	sdkmath "cosmossdk.io/math"
@@ -15,18 +16,30 @@ import (
 	"github.com/trinitystake/dvpnd/v9/types"
 )
 
-// The jobs never stop the node over a failed pass: an RPC outage, a proxy
-// API that does not answer, or a session the chain dropped mid-pass is logged
-// and tried again at the next tick. Stopping instead would cut every client's
-// tunnel and restart the node into the same outage.
+// runJob runs a job's pass at once and then at every tick, for the life of
+// the node; the first pass does not wait, because a freshly registered node
+// is inactive until its first status update.
+//
+// A failed pass never stops the node: an RPC outage, a proxy API that does
+// not answer, or a session the chain dropped mid-pass is logged and tried
+// again at the next tick. Stopping instead would cut every client's tunnel
+// and restart the node into the same outage. A panic is a bug, and ends the
+// node the way a failed API server does, so the VPN service is still stopped
+// on the way out.
+func (n *Node) runJob(name string, interval time.Duration, pass func() error, errCh chan<- error) {
+	defer func() {
+		if r := recover(); r != nil {
+			errCh <- fmt.Errorf("job %s panicked: %v\n%s", name, r, debug.Stack())
+		}
+	}()
 
-func (n *Node) jobSetSessions() {
-	n.Log().Info("Starting a job", "name", "set_sessions", "interval", n.IntervalSetSessions())
+	n.Log().Info("Starting a job", "name", name, "interval", interval)
 
-	t := time.NewTicker(n.IntervalSetSessions())
+	t := time.NewTicker(interval)
+	defer t.Stop()
 	for ; ; <-t.C {
-		if err := n.setSessions(); err != nil {
-			n.Log().Error("set_sessions pass failed; retrying at the next tick", "error", err)
+		if err := pass(); err != nil {
+			n.Log().Error(name+" pass failed; retrying at the next tick", "error", err)
 		}
 	}
 }
@@ -109,34 +122,6 @@ func reportedUsage(item types.Session, peer types.Peer) (upload, download int64,
 	download = item.BaseDownload + peer.Download
 
 	return upload, download, upload != item.Upload || download != item.Download
-}
-
-// jobUpdateStatus keeps the node marked active on-chain. It runs once
-// immediately: a freshly registered node is inactive until its first status
-// update, and the chain deactivates a node whose status is older than its
-// status_timeout parameter.
-func (n *Node) jobUpdateStatus() {
-	n.Log().Info("Starting a job", "name", "update_status", "interval", n.IntervalUpdateStatus())
-
-	t := time.NewTicker(n.IntervalUpdateStatus())
-	for {
-		if err := n.UpdateNodeStatus(); err != nil {
-			n.Log().Error("update_status failed; retrying at the next tick", "error", err)
-		}
-
-		<-t.C
-	}
-}
-
-func (n *Node) jobUpdateSessions() {
-	n.Log().Info("Starting a job", "name", "update_sessions", "interval", n.IntervalUpdateSessions())
-
-	t := time.NewTicker(n.IntervalUpdateSessions())
-	for ; ; <-t.C {
-		if err := n.updateSessions(); err != nil {
-			n.Log().Error("update_sessions pass failed; retrying at the next tick", "error", err)
-		}
-	}
 }
 
 // updateSessions reconciles the local session table with the chain (v3):

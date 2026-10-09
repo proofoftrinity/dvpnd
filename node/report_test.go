@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -175,7 +176,7 @@ func TestJobPanicEndsTheNodeCleanly(t *testing.T) {
 	n := testNode(&fakeChain{})
 	errCh := make(chan error, 1)
 
-	go n.runJob("boom", func() { panic("nil map") }, errCh)
+	go n.runJob("boom", time.Hour, func() error { panic("nil map") }, errCh)
 
 	select {
 	case err := <-errCh:
@@ -184,6 +185,54 @@ func TestJobPanicEndsTheNodeCleanly(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("no error from a panicking job")
+	}
+}
+
+// TestAFailedPassIsTriedAgain: a pass that fails is logged and run again at
+// the next tick; the job carries on rather than ending, and so does the node.
+//
+// Rules: [SL-12].
+func TestAFailedPassIsTriedAgain(t *testing.T) {
+	n := testNode(&fakeChain{})
+	errCh := make(chan error, 1)
+	var passes atomic.Int32
+	pass := func() error {
+		if passes.Add(1) < 3 {
+			return errors.New("connection refused")
+		}
+		panic("third pass") // a panic is the one way out of a job, so the test can end it
+	}
+
+	go n.runJob("retry", time.Millisecond, pass, errCh)
+
+	select {
+	case err := <-errCh:
+		if !strings.Contains(err.Error(), "job retry panicked: third pass") {
+			t.Fatalf("err = %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatalf("the job stopped after %d passes; a failed pass must be tried again", passes.Load())
+	}
+}
+
+// TestAJobRunsItsFirstPassAtOnce: the first pass does not wait for a tick,
+// because a freshly registered node is inactive until its first status
+// update.
+//
+// Rules: [SL-13].
+func TestAJobRunsItsFirstPassAtOnce(t *testing.T) {
+	n := testNode(&fakeChain{})
+	errCh := make(chan error, 1)
+
+	go n.runJob("first", time.Hour, func() error { panic("first pass") }, errCh)
+
+	select {
+	case err := <-errCh:
+		if !strings.Contains(err.Error(), "first pass") {
+			t.Fatalf("err = %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the first pass waited for a tick")
 	}
 }
 

@@ -4,9 +4,7 @@
 package node
 
 import (
-	"fmt"
 	"path"
-	"runtime/debug"
 
 	sessiontypes "github.com/sentinel-official/sentinelhub/v12/x/session/types/v3"
 	subscriptiontypes "github.com/sentinel-official/sentinelhub/v12/x/subscription/types/v3"
@@ -64,9 +62,9 @@ func (n *Node) Initialize() error {
 func (n *Node) Start(home string) error {
 	errCh := make(chan error, 4)
 
-	go n.runJob("set_sessions", n.jobSetSessions, errCh)
-	go n.runJob("update_sessions", n.jobUpdateSessions, errCh)
-	go n.runJob("update_status", n.jobUpdateStatus, errCh)
+	go n.runJob("set_sessions", n.IntervalSetSessions(), n.setSessions, errCh)
+	go n.runJob("update_sessions", n.IntervalUpdateSessions(), n.updateSessions, errCh)
+	go n.runJob("update_status", n.IntervalUpdateStatus(), n.UpdateNodeStatus, errCh)
 
 	var (
 		certFile = path.Join(home, "tls.crt")
@@ -84,17 +82,4 @@ func (n *Node) Start(home string) error {
 	}()
 
 	return <-errCh
-}
-
-// runJob runs a job for the life of the node. A job logs its own failures
-// and carries on; a panic is a bug, and ends the node the way a failed API
-// server does, so the VPN service is still stopped on the way out.
-func (n *Node) runJob(name string, job func(), errCh chan<- error) {
-	defer func() {
-		if r := recover(); r != nil {
-			errCh <- fmt.Errorf("job %s panicked: %v\n%s", name, r, debug.Stack())
-		}
-	}()
-
-	job()
 }

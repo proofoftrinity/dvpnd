@@ -561,6 +561,16 @@
         "go test -count=1 -run '^(TestUsageUpdateWritesBothColumns)$' ./node/"
       ],
       "expect": "--- FAIL"
+    },
+    {
+      "name": "[SL-12] a failed job pass ends the job",
+      "file": "node/jobs.go",
+      "find": "\t\t\tn.Log().Error(name+\" pass failed; retrying at the next tick\", \"error\", err)",
+      "replace": "\t\t\treturn",
+      "run": [
+        "go test -count=1 -run '^(TestAFailedPassIsTriedAgain)$' ./node/"
+      ],
+      "expect": "--- FAIL"
     }
   ]
 }

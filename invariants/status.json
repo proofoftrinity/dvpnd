@@ -1,8 +1,6 @@
 {
   "pending": {},
-  "partial": {
-    "SL-12": "a panicking job and each pass's error handling are tested; the job loops that log and retry are not"
-  },
+  "partial": {},
   "manual": {
     "LIC-7": "checked by go-licenses in the Licence gate job of .github/workflows/ci.yml on every push and pull request; it needs the network, so no local test runs it. Re-check by hand after a dependency change with the command in that job"
   }

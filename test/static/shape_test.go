@@ -317,3 +317,44 @@ func TestOneLoopOverTheRemotes(t *testing.T) {
 		t.Fatalf("the remote list is read by %v; only eachRemote may loop over it", readers)
 	}
 }
+
+// TestOneLoopForTheJobs: the node's periodic work runs in one loop, runJob,
+// whose test checks that a failed pass is tried again; no job keeps a ticker,
+// a timer or a sleep of its own, whose loop could end on an error.
+//
+// Rules: [SL-12].
+func TestOneLoopForTheJobs(t *testing.T) {
+	waits := map[string]bool{"NewTicker": true, "Tick": true, "NewTimer": true, "After": true, "AfterFunc": true, "Sleep": true}
+	fset := token.NewFileSet()
+	clocks := map[string][]string{}
+	for _, f := range files(t, "node/*.go") {
+		if strings.HasSuffix(f, "_test.go") {
+			continue
+		}
+		file, err := parser.ParseFile(fset, filepath.Join(root(t), f), nil, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, d := range file.Decls {
+			fd, ok := d.(*ast.FuncDecl)
+			if !ok {
+				continue
+			}
+			ast.Inspect(fd, func(n ast.Node) bool {
+				if sel, ok := n.(*ast.SelectorExpr); ok && waits[sel.Sel.Name] {
+					if id, ok := sel.X.(*ast.Ident); ok && id.Name == "time" {
+						clocks[fd.Name.Name] = append(clocks[fd.Name.Name], fset.Position(sel.Pos()).String())
+					}
+				}
+				return true
+			})
+		}
+	}
+	if len(clocks["runJob"]) == 0 {
+		t.Fatal("runJob keeps no ticker: re-aim this test at the loop that runs the jobs")
+	}
+	delete(clocks, "runJob")
+	for fn, at := range clocks {
+		t.Errorf("%s waits on a clock of its own at %v: run it as a job through runJob", fn, at)
+	}
+}
