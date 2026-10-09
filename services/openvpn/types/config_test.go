@@ -52,6 +52,8 @@ func TestConfig(t *testing.T) {
 
 // TestConfigWithManagementPort: a file written when the management interface
 // was a loopback port still reads; the port is ignored.
+//
+// Rules: [RT-9].
 func TestConfigWithManagementPort(t *testing.T) {
 	path := filepath.Join(t.TempDir(), ConfigFileName)
 	c := NewConfig().WithDefaultValues()

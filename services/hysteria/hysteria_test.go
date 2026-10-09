@@ -173,6 +173,7 @@ func itoa(v uint16) string {
 	return strconv.Itoa(int(v))
 }
 
+// Rules: [RT-6].
 func TestInitRequiresBinary(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
 	saved := binaryName
@@ -185,6 +186,7 @@ func TestInitRequiresBinary(t *testing.T) {
 	}
 }
 
+// Rules: [SL-1].
 func TestAuthHook(t *testing.T) {
 	s := NewHysteria()
 	data, err := s.ParsePeerRequest([]byte(`{"uuid":"01020304-0506-0708-090a-0b0c0d0e0f10"}`))
@@ -231,6 +233,7 @@ func TestAuthHook(t *testing.T) {
 	}
 }
 
+// Rules: [SL-1], [SL-16].
 func TestPeersAndKick(t *testing.T) {
 	s := NewHysteria()
 	s.config = hysteriatypes.NewConfig().WithDefaultValues()
@@ -293,6 +296,7 @@ func TestPeersAndKick(t *testing.T) {
 	}
 }
 
+// Rules: [RT-3].
 func TestStartStop(t *testing.T) {
 	stubBinary(t)
 	dir, cfg := home(t, "")
@@ -327,6 +331,7 @@ func TestStartStop(t *testing.T) {
 	}
 }
 
+// Rules: [CT-3], [CT-4].
 func TestHandshakePayload(t *testing.T) {
 	stubBinary(t)
 	dir, _ := home(t, "salt")
@@ -359,6 +364,8 @@ func TestHandshakePayload(t *testing.T) {
 // TestServerArgs: hysteria's info level logs every client's address, so the
 // node asks for it only when it runs at debug itself; the update check, an
 // outside call nobody chose, is always off.
+//
+// Rules: [PV-2].
 func TestServerArgs(t *testing.T) {
 	t.Cleanup(func() { common.SetVerbose(false) })
 
@@ -412,6 +419,8 @@ func aclRules(t *testing.T, dir string) []string {
 // TestInitRendersEgressPolicy: a client cannot reach the blocked networks
 // (the auth hook and the statistics API on loopback among them), localhost by
 // name, or port 25 unless the operator allows it.
+//
+// Rules: [EG-1], [EG-4], [EG-5].
 func TestInitRendersEgressPolicy(t *testing.T) {
 	stubBinary(t)
 	t.Cleanup(func() { common.SetEgress(common.Egress{}) })

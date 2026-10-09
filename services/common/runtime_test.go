@@ -10,6 +10,7 @@ import (
 	"testing"
 )
 
+// Rules: [EG-6].
 func TestProxyEgress(t *testing.T) {
 	f := fakeIptables(t)
 	withEgress(t, Egress{APIPort: 8585})
@@ -67,6 +68,7 @@ func TestProxyEgress(t *testing.T) {
 	}
 }
 
+// Rules: [RT-1].
 func TestPrepareRuntimeAsAUser(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("RUNTIME_DIRECTORY", "")
@@ -109,6 +111,8 @@ func TestPrepareRuntimeAsAUser(t *testing.T) {
 
 // TestPrepareRuntimeAsRoot runs only as root, which may hand the directory
 // to the proxy account's group.
+//
+// Rules: [RT-1].
 func TestPrepareRuntimeAsRoot(t *testing.T) {
 	if os.Geteuid() != 0 {
 		t.Skip("needs root")
@@ -133,6 +137,7 @@ func TestPrepareRuntimeAsRoot(t *testing.T) {
 	}
 }
 
+// Rules: [RT-1].
 func TestProxyAttr(t *testing.T) {
 	if (Runtime{}).proxyAttr(443) != nil {
 		t.Fatal("without a proxy account the daemon runs as the node")

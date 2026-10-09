@@ -18,6 +18,8 @@ import (
 // TestKeysAddShowsOnlyANewMnemonic: a new key's mnemonic is printed once, as
 // its only backup; a recovered one is not printed back, so it does not end up
 // in the scrollback or in a log of the install.
+//
+// Rules: [PV-5].
 func TestKeysAddShowsOnlyANewMnemonic(t *testing.T) {
 	dir := t.TempDir()
 	cfg := types.NewConfig().WithDefaultValues()

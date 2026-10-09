@@ -22,6 +22,8 @@ jobs:
       - run: go build ./...
       # The regression gate every change passes (test/README.md).
       - run: make check
+      # Each canary breaks one rule on purpose; its test must fail.
+      - run: make check-canaries
       - run: make build
       - run: ./bin/dvpnd --help | head -3
 

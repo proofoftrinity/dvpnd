@@ -115,6 +115,7 @@ func startFakeAPI(t *testing.T) (*fakeAPI, *V2Ray) {
 	return api, s
 }
 
+// Rules: [SL-1].
 func TestPeersOverTheAPI(t *testing.T) {
 	api, s := startFakeAPI(t)
 
@@ -154,6 +155,8 @@ func TestPeersOverTheAPI(t *testing.T) {
 
 // TestAPICallsAreBounded: a proxy that stops answering fails the call after
 // rpcTimeout instead of holding the handshake or the job forever.
+//
+// Rules: [RT-5].
 func TestAPICallsAreBounded(t *testing.T) {
 	saved := rpcTimeout
 	rpcTimeout = 200 * time.Millisecond
@@ -178,6 +181,8 @@ func TestAPICallsAreBounded(t *testing.T) {
 // (a handshake right after the node starts) waits for its API, within
 // rpcTimeout, instead of failing at once; with no proxy at all it fails at
 // rpcTimeout.
+//
+// Rules: [RT-5].
 func TestAPICallWaitsForTheProxy(t *testing.T) {
 	saved := rpcTimeout
 	rpcTimeout = 3 * time.Second

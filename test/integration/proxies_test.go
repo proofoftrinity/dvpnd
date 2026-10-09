@@ -58,6 +58,8 @@ func proxyCases() []proxyCase {
 // with mail allowed, the client must reach the internet and the node API and
 // nothing else; the node must count its traffic; once the peer is removed it
 // must reach nothing; once the service stops nothing of it may be left.
+//
+// Rules: [EG-12], [RT-1], [RT-7], [SL-1], [SL-16].
 func TestProxies(t *testing.T) {
 	requireEnv(t)
 

@@ -7,6 +7,7 @@ import (
 	"testing"
 )
 
+// Rules: [PV-3].
 func TestKeyTag(t *testing.T) {
 	const key = "AWJjZTVmY2Y0LTY0MjktNDQ5ZS1hMzZmLWU4NmVjZjVhYzk0Nw=="
 

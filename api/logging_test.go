@@ -16,6 +16,7 @@ import (
 	"github.com/trinitystake/dvpnd/v9/context"
 )
 
+// Rules: [HS-12], [PV-1].
 func TestLogRefusals(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -75,6 +76,7 @@ func TestLogRefusals(t *testing.T) {
 	}
 }
 
+// Rules: [CT-2].
 func TestServerHeader(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	version.Version = "1.2.3"
@@ -93,6 +95,8 @@ func TestServerHeader(t *testing.T) {
 
 // TestReplySigningHeader: every response, a refusal and an unknown path
 // included, says that the node signs its handshake replies.
+//
+// Rules: [HS-7].
 func TestReplySigningHeader(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

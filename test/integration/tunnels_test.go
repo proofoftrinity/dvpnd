@@ -86,6 +86,8 @@ func tunnelCases() []tunnelCase {
 // reaches the private network and the host, which shows the network under
 // test would have let it through. The node must count the traffic, cut the
 // client off when the peer is removed, and leave no rules behind.
+//
+// Rules: [EG-12], [RT-7], [SL-1], [SL-16].
 func TestTunnels(t *testing.T) {
 	requireEnv(t)
 	if os.Getenv("DVPND_IT_TUNNELS") != "1" {
@@ -582,6 +584,8 @@ func hasIPv4(t *testing.T, iface string) bool {
 // namespace of its own and so runs under the systemd unit too: the server
 // must open its tunnel, drop to the proxy account, answer the node over its
 // management socket, and leave nothing behind when stopped.
+//
+// Rules: [RT-1], [RT-7].
 func TestOpenVPNDaemon(t *testing.T) {
 	requireEnv(t)
 	if _, err := exec.LookPath("openvpn"); err != nil {

@@ -19,6 +19,7 @@ import (
 	"github.com/trinitystake/dvpnd/v9/types"
 )
 
+// Rules: [HS-2].
 func TestRequireTLS(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -41,6 +42,7 @@ func TestRequireTLS(t *testing.T) {
 	}
 }
 
+// Rules: [HS-3].
 func TestRateLimiter(t *testing.T) {
 	now := time.Unix(1000, 0)
 	l := newRateLimiter(3, time.Minute)
@@ -72,6 +74,7 @@ func TestRateLimiter(t *testing.T) {
 	}
 }
 
+// Rules: [HS-3].
 func TestClientBlock(t *testing.T) {
 	for in, want := range map[string]string{
 		"203.0.113.9":          "203.0.113.9",
@@ -88,6 +91,7 @@ func TestClientBlock(t *testing.T) {
 	}
 }
 
+// Rules: [HS-3].
 func TestLimitHandshakes(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -126,6 +130,8 @@ func TestLimitHandshakes(t *testing.T) {
 // TestReplyErrorHidesNodeFailures: a client is told why its request was
 // refused, but not the internals of a failure inside the node, which the
 // operator finds in the log instead.
+//
+// Rules: [HS-8].
 func TestReplyErrorHidesNodeFailures(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

@@ -14,6 +14,8 @@ import (
 
 // TestLegacyEndpointOffByDefault: the replayable legacy endpoint exists only
 // when the operator turns it on; the current handshake is always there.
+//
+// Rules: [HS-4].
 func TestLegacyEndpointOffByDefault(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

@@ -13,6 +13,7 @@ import (
 	"github.com/trinitystake/dvpnd/v9/types"
 )
 
+// Rules: [CH-6].
 func TestAuthzCommands(t *testing.T) {
 	var buf bytes.Buffer
 	err := authzGrants{
@@ -52,6 +53,8 @@ func TestAuthzCommands(t *testing.T) {
 // TestExpectedFees: the default node, at 0.1udvpn for 210000 gas a
 // transaction, sends a status update every 55 minutes and a session report
 // every 115 minutes; over 14 days that is 366 + 175 transactions.
+//
+// Rules: [CH-7].
 func TestExpectedFees(t *testing.T) {
 	config := types.NewConfig().WithDefaultValues()
 	got := expectedFees(config, 14*24*time.Hour)

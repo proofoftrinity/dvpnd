@@ -15,6 +15,7 @@ import (
 	nodetypes "github.com/sentinel-official/sentinelhub/v12/x/node/types/v3"
 )
 
+// Rules: [CH-6].
 func TestNodeMsgTypeURLs(t *testing.T) {
 	want := []string{
 		"/sentinel.node.v3.MsgRegisterNodeRequest",
@@ -44,6 +45,7 @@ func onlyExec(t *testing.T, inner feegrant.FeeAllowanceI) *feegrant.AllowedMsgAl
 	return a
 }
 
+// Rules: [CH-4].
 func TestEvaluateGrants(t *testing.T) {
 	var (
 		now      = time.Date(2026, 10, 2, 12, 0, 0, 0, time.UTC)
@@ -104,6 +106,8 @@ func TestEvaluateGrants(t *testing.T) {
 // TestHotKeyTransactions: with a granter the node's messages travel in one
 // MsgExec from the hot key, and the granter pays the fee; without one they
 // go as they are.
+//
+// Rules: [CH-2].
 func TestHotKeyTransactions(t *testing.T) {
 	var (
 		hot     = sdk.AccAddress([]byte("hot-key-address-0001"))
@@ -146,6 +150,8 @@ func TestHotKeyTransactions(t *testing.T) {
 // TestNoAuthorization: the chain answers a Grants query for a missing grant
 // with an error, which must read as "no grant" so the node names the grant to
 // make instead of failing on what looks like an RPC fault.
+//
+// Rules: [CH-5].
 func TestNoAuthorization(t *testing.T) {
 	mainnet := errors.New("rpc error: code = Unknown desc = authorization not found for " +
 		"/sentinel.node.v3.MsgUpdateNodeStatusRequest type: authorization not found: unknown request")

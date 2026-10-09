@@ -15,6 +15,8 @@ import (
 // A client that reconnects after a node restart keeps its on-chain session;
 // the service's counters start again from zero, so the totals must be built
 // on what the chain already held or the chain refuses the report.
+//
+// Rules: [SL-2].
 func TestReportedUsage(t *testing.T) {
 	cases := []struct {
 		name             string
@@ -48,6 +50,8 @@ func TestReportedUsage(t *testing.T) {
 
 // The counter update names its columns so a zero download is written too
 // (a struct update would skip it as a zero value).
+//
+// Rules: [SL-15].
 func TestUsageUpdateWritesBothColumns(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{Logger: gormlogger.Discard})
 	if err != nil {

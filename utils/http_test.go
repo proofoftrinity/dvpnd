@@ -15,6 +15,7 @@ import (
 	cmtlog "github.com/cometbft/cometbft/libs/log"
 )
 
+// Rules: [HS-10].
 func TestNewServerHasLimits(t *testing.T) {
 	s := newServer(http.NotFoundHandler(), cmtlog.NewNopLogger())
 	if s.ReadHeaderTimeout == 0 || s.ReadTimeout == 0 || s.IdleTimeout == 0 || s.MaxHeaderBytes == 0 || s.ErrorLog == nil {
@@ -47,6 +48,8 @@ func (b *syncBuffer) String() string {
 // makes the HTTP server log the remote address. That line must reach the
 // node's logger at debug level, not stderr, so a node at the default level
 // keeps no client addresses.
+//
+// Rules: [PV-1].
 func TestServerMessagesGoToTheDebugLog(t *testing.T) {
 	var buf syncBuffer
 	srv := httptest.NewUnstartedServer(http.NotFoundHandler())

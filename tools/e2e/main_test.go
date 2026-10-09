@@ -13,6 +13,8 @@ import (
 )
 
 // The vector api/session's TestReplyDigestVector pins for the node.
+//
+// Rules: [HS-6].
 func TestReplyDigestVector(t *testing.T) {
 	got := replyDigest(42, []byte(`{"public_key":"abc"}`),
 		[]byte(`{"addrs":["10.8.0.2/32"],"metadata":[{"port":51820}]}`),

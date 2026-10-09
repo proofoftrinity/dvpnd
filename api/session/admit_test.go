@@ -147,6 +147,8 @@ func rows(t *testing.T, db *gorm.DB) int64 {
 
 // TestConcurrentHandshakesHoldMaxPeers: many clients at once cannot together
 // exceed max_peers, and every admitted peer has its row.
+//
+// Rules: [SL-4].
 func TestConcurrentHandshakesHoldMaxPeers(t *testing.T) {
 	ctx, service, db, _ := admissionRig(t, 3)
 	accounts := map[uint64]sdk.AccAddress{}
@@ -183,6 +185,8 @@ func TestConcurrentHandshakesHoldMaxPeers(t *testing.T) {
 
 // TestConcurrentHandshakesForOneSession: the same session handshaking many
 // times at once (a retrying client, or a replay) gets one peer and one row.
+//
+// Rules: [SL-4].
 func TestConcurrentHandshakesForOneSession(t *testing.T) {
 	ctx, service, db, account := admissionRig(t, 50)
 	chain := &fakeChain{node: ctx.Address().String(), account: func(uint64) string { return account.String() }}
@@ -216,6 +220,8 @@ func TestConcurrentHandshakesForOneSession(t *testing.T) {
 
 // TestFailedRecordRemovesThePeer: when the session row cannot be written the
 // peer comes out again, so it is never served unmetered.
+//
+// Rules: [SL-5].
 func TestFailedRecordRemovesThePeer(t *testing.T) {
 	ctx, service, db, account := admissionRig(t, 50)
 	chain := &fakeChain{node: ctx.Address().String(), account: func(uint64) string { return account.String() }}
@@ -234,6 +240,7 @@ func TestFailedRecordRemovesThePeer(t *testing.T) {
 	}
 }
 
+// Rules: [SL-6].
 func TestAdmissionRefusesAnotherNodesSession(t *testing.T) {
 	ctx, service, _, account := admissionRig(t, 50)
 	chain := &fakeChain{node: "sentnode1someoneelse", account: func(uint64) string { return account.String() }}

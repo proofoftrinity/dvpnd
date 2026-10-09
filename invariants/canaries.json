@@ -1,0 +1,41 @@
+{
+  "link": [],
+  "env": {
+    "GOFLAGS": "-trimpath"
+  },
+  "unsetEnv": [],
+  "concurrency": 0,
+  "timeout": 600,
+  "canaries": [
+    {
+      "name": "[SL-2] the reported upload ignores what the chain already held",
+      "file": "node/jobs.go",
+      "find": "\tupload = item.BaseUpload + peer.Upload",
+      "replace": "\tupload = peer.Upload",
+      "run": [
+        "go test -count=1 -run '^TestReportedUsage$' ./node/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[EG-2] the link-local range (the metadata service) is not blocked",
+      "file": "services/common/egress.go",
+      "find": "\t\t\"169.254.0.0/16\",\n",
+      "replace": "",
+      "run": [
+        "go test -count=1 -run '^TestBlockedNetworks$' ./services/common/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[HS-2] a handshake over plain HTTP is accepted",
+      "file": "api/session/guard.go",
+      "find": "\t\tif c.Request.TLS == nil {",
+      "replace": "\t\tif false && c.Request.TLS == nil {",
+      "run": [
+        "go test -count=1 -run '^TestRequireTLS$' ./api/session/"
+      ],
+      "expect": "--- FAIL"
+    }
+  ]
+}

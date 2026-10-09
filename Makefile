@@ -15,17 +15,19 @@ check-architecture:
 	@bash scripts/check-architecture-doc.sh
 
 # The regression gate (test/README.md): every change passes it before it is
-# committed. Formatting, vet (the integration tests included), every unit test
-# with the race detector, SPDX headers, the licence rule and the provenance
-# record. No network, no root, no Docker.
+# committed. The rule registry (every rule in docs/invariants/ pinned by a test
+# or excused in invariants/status.json), formatting, vet (the integration
+# tests included), every unit test with the race detector, SPDX headers, the
+# licence rule and the provenance record. No network, no root, no Docker.
 GO_FILES = $$(git ls-files --cached --others --exclude-standard '*.go')
 .PHONY: check
 check:
+	@python3 invariants/registry.py
 	@unformatted=$$(gofmt -l $(GO_FILES)); \
 	  [ -z "$$unformatted" ] || { echo "gofmt: not formatted:"; echo "$$unformatted"; exit 1; }
 	go vet ./...
 	go vet -tags integration ./test/integration/
-	go test -race -count=1 ./...
+	go test -race -shuffle=on -count=1 ./...
 	@missing=$$(grep -L 'SPDX-License-Identifier: Apache-2.0' $(GO_FILES)); \
 	  [ -z "$$missing" ] || { echo "missing SPDX header:"; echo "$$missing"; exit 1; }
 	@! grep -q 'sentinel-official/sentinel-go-sdk' go.mod go.sum || \
@@ -39,8 +41,18 @@ check:
 check-integration:
 	@bash test/integration/run.sh
 
+# The mutation canaries (test/README.md): each breaks one rule on purpose in
+# a copy of the tree, and the rule's own test must fail.
+.PHONY: check-canaries
+check-canaries:
+	@python3 invariants/canaries.py
+
+# What every commit passes: the gate, then the canaries.
+.PHONY: verify
+verify: check check-canaries
+
 .PHONY: check-all
-check-all: check check-integration
+check-all: verify check-integration
 
 .PHONY: benchmark
 benchmark:

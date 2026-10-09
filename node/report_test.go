@@ -95,6 +95,8 @@ func sessions(ids ...uint64) []types.Session {
 
 // TestReportDropsASessionTheChainEnded: one session the chain deleted between
 // the query and the send no longer holds back the others' reports.
+//
+// Rules: [SL-11].
 func TestReportDropsASessionTheChainEnded(t *testing.T) {
 	chain := &fakeChain{sessions: map[uint64]v1base.Status{
 		1: v1base.StatusActive, 3: v1base.StatusInactivePending,
@@ -113,6 +115,8 @@ func TestReportDropsASessionTheChainEnded(t *testing.T) {
 
 // TestReportOneAtATime: when the second batch still fails, each session is
 // sent on its own and the good ones get through.
+//
+// Rules: [SL-11].
 func TestReportOneAtATime(t *testing.T) {
 	chain := &fakeChain{sessions: map[uint64]v1base.Status{1: v1base.StatusActive, 2: v1base.StatusActive}}
 	n := testNode(chain)
@@ -149,6 +153,8 @@ func (r *refusing) UpdateSessions(items ...types.Session) error {
 
 // TestReportDuringAnOutage: with the chain unreachable the report is left
 // for the next pass, not sent session by session.
+//
+// Rules: [SL-11].
 func TestReportDuringAnOutage(t *testing.T) {
 	chain := &fakeChain{down: true, sessions: map[uint64]v1base.Status{}}
 
@@ -163,6 +169,8 @@ func TestReportDuringAnOutage(t *testing.T) {
 // TestJobPanicEndsTheNodeCleanly: a job that panics hands an error to the
 // node's error channel instead of crashing the process, so the caller still
 // stops the VPN service.
+//
+// Rules: [SL-12].
 func TestJobPanicEndsTheNodeCleanly(t *testing.T) {
 	n := testNode(&fakeChain{})
 	errCh := make(chan error, 1)
@@ -195,6 +203,8 @@ func (p *peerSet) RemovePeer(data []byte) error {
 // row, a session the chain cannot be asked about waits for the next pass, and
 // the rest is reported, all in one pass that does not stop at the first
 // problem.
+//
+// Rules: [SL-10].
 func TestUpdateSessionsPass(t *testing.T) {
 	db := testDB(t)
 	// Keys are base64 of the peer data the service holds.

@@ -10,6 +10,8 @@ import (
 
 // Every registry entry must agree with the service it constructs, and the
 // numbers and names must be the ones clients on the network use.
+//
+// Rules: [CT-1].
 func TestRegistryAgreesWithServices(t *testing.T) {
 	want := map[string]uint64{"wireguard": 1, "v2ray": 2, "xray": 4, "hysteria2": 6, "amneziawg": 5, "openvpn": 3}
 
@@ -38,6 +40,7 @@ func TestRegistryAgreesWithServices(t *testing.T) {
 	}
 }
 
+// Rules: [CT-1].
 func TestNodeTypesRegistered(t *testing.T) {
 	cfg := types.NewConfig().WithDefaultValues()
 	cfg.Node.Type = "bogus"
@@ -54,6 +57,8 @@ func TestNodeTypesRegistered(t *testing.T) {
 
 // TestHandshakeDNSTypesHaveATunnel: the Handshake resolver listens on the
 // tunnel address, so every type allowed to run it must report one.
+//
+// Rules: [PV-8].
 func TestHandshakeDNSTypesHaveATunnel(t *testing.T) {
 	for _, p := range All() {
 		if !p.HandshakeDNS {

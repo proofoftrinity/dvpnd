@@ -12,6 +12,7 @@ import (
 	"testing"
 )
 
+// Rules: [EG-2], [EG-3].
 func TestBlockedNetworks(t *testing.T) {
 	var nets []*net.IPNet
 	for _, cidr := range BlockedNetworksV4 {
@@ -163,6 +164,7 @@ func withEgress(t *testing.T, e Egress) {
 	t.Cleanup(func() { SetEgress(saved) })
 }
 
+// Rules: [EG-8], [EG-9].
 func TestTunnelEgressUpDown(t *testing.T) {
 	f := fakeIptables(t)
 	withEgress(t, Egress{APIPort: 8585, Resolver: net.ParseIP("10.8.0.1")})
@@ -231,6 +233,7 @@ func TestTunnelEgressUpDown(t *testing.T) {
 	e.Down()
 }
 
+// Rules: [EG-1], [EG-4], [EG-8].
 func TestTunnelEgressPolicy(t *testing.T) {
 	f := fakeIptables(t)
 	withEgress(t, Egress{AllowSMTP: true})
@@ -250,6 +253,7 @@ func TestTunnelEgressPolicy(t *testing.T) {
 	}
 }
 
+// Rules: [EG-11].
 func TestTunnelEgressWithoutIPv6(t *testing.T) {
 	f := fakeIptables(t)
 	withEgress(t, Egress{})
@@ -270,6 +274,7 @@ func TestTunnelEgressWithoutIPv6(t *testing.T) {
 	}
 }
 
+// Rules: [EG-10].
 func TestTunnelEgressFailure(t *testing.T) {
 	f := fakeIptables(t)
 	withEgress(t, Egress{})
@@ -289,6 +294,7 @@ func TestTunnelEgressFailure(t *testing.T) {
 	}
 }
 
+// Rules: [EG-9].
 func TestChainNamesFitIptables(t *testing.T) {
 	e := TunnelEgress{Interface: strings.Repeat("x", 15)} // IFNAMSIZ - 1
 	for _, name := range []string{e.ForwardChain(), e.InputChain()} {

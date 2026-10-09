@@ -136,6 +136,7 @@ func newKey(t *testing.T) *wgtypes.Key {
 	return key.Public()
 }
 
+// Rules: [CT-7].
 func TestInitWritesInterfaceConfigs(t *testing.T) {
 	confDir, cfg, s := setup(t)
 
@@ -199,6 +200,8 @@ func TestInitWritesInterfaceConfigs(t *testing.T) {
 
 // A node's service has no preset pools: each tier runs on the networks its
 // key derives, and a peer's address still says which tier it is on.
+//
+// Rules: [CT-8].
 func TestInitDerivesTunnelNetworks(t *testing.T) {
 	withFakeAwg(t)
 	confDir, cfg, _ := setup(t)
@@ -272,6 +275,7 @@ func TestInitDerivesTunnelNetworks(t *testing.T) {
 	}
 }
 
+// Rules: [CT-3], [CT-4], [CT-7].
 func TestHandshakePayload(t *testing.T) {
 	_, cfg, s := setup(t)
 	if err := s.Init(home(t, cfg)); err != nil {
@@ -331,6 +335,7 @@ func assertPayload(t *testing.T, s *AmneziaWG, result []byte, want string) {
 	}
 }
 
+// Rules: [CT-7], [SL-1].
 func TestPeersGoToTheTierTheyAskedFor(t *testing.T) {
 	tool := withFakeAwg(t)
 	_, cfg, s := setup(t)
@@ -417,6 +422,7 @@ func TestPeersGoToTheTierTheyAskedFor(t *testing.T) {
 	}
 }
 
+// Rules: [CT-5], [CT-7].
 func TestParsePeerRequestVersions(t *testing.T) {
 	_, cfg, s := setup(t)
 	if err := s.Init(home(t, cfg)); err != nil {
@@ -441,6 +447,7 @@ func TestParsePeerRequestVersions(t *testing.T) {
 	}
 }
 
+// Rules: [CT-3], [CT-7].
 func TestTierDisabled(t *testing.T) {
 	confDir, cfg, s := setup(t)
 	cfg.V3.Enabled = false
@@ -472,6 +479,7 @@ func TestTierDisabled(t *testing.T) {
 	}
 }
 
+// Rules: [RT-6].
 func TestInitRequiresTools(t *testing.T) {
 	_, cfg, s := setup(t)
 	lookPath = func(name string) (string, error) { return "", errors.New("not found: " + name) }

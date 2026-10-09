@@ -1,0 +1,31 @@
+{
+  "pending": {
+    "SL-3": "known bug B1: reportedUsage counts a peer as moved only when its upload changed; the failing case for TestReportedUsage lands in P2, the fix on approval",
+    "SL-7": "the byte-cap and allocation refusals in admit() have no test yet; P2 adds a table of admission refusals",
+    "SL-8": "the eviction of an account's earlier peer has no test yet; P2 adds it to the admission tests",
+    "SL-9": "setSessions has no test yet; P2 adds one with a fake service and an in-memory database",
+    "SL-13": "the 80% cap is computed inline in cmd/start.go; P2 moves it into a function and tests it",
+    "HS-13": "nothing checks the environment V2Ray starts with; P2 adds a test that it lacks V2RAY_VMESS_AEAD_FORCED=false",
+    "CH-8": "the remote loops in lite/ have no test; P2 adds one with two fake remotes, the first failing",
+    "CT-6": "no test reads Info(); P2 checks the port bytes for every protocol in the registry",
+    "RT-2": "known bug B2: a step that fails after service.Start() returns without stopping it; P1 adds the static check, the fix on approval",
+    "LIC-1": "checked by a shell step in make check, not by a test; P1 moves it into test/static",
+    "LIC-2": "checked by a shell step in make check and the CI licence gate, not by a test; P1 moves it into test/static",
+    "LIC-3": "known bug B3: four changed upstream files lack the notice; P1 adds the check, the fix on approval",
+    "LIC-4": "no check yet; P1 compares LICENSE with the fork point and reads NOTICE",
+    "LIC-5": "run by make check and the CI provenance job as a script; P1 decides whether a test can run it offline",
+    "LIC-6": "no check yet; P1 scans tracked files for checksum-valid bech32 addresses",
+    "LIC-7": "checked by go-licenses in the CI licence gate only; P4 decides whether it becomes manual"
+  },
+  "partial": {
+    "SL-6": "only the refusal of another node's session is tested; a missing or inactive session, another account's, an inactive subscription and a missing allocation are not (P2)",
+    "SL-12": "a panicking job and each pass's error handling are tested; the job loops that log and retry are not",
+    "HS-3": "the limiter and the client block are tested; that a spoofed X-Forwarded-For does not escape the limit is not (P2)",
+    "HS-7": "the header on every response is tested; its CORS exposure is set in cmd/start.go and is not (P2)",
+    "PV-2": "Hysteria, OpenVPN and XRAY are tested; V2Ray's logging set to none is not",
+    "PV-4": "the test opens the database with its own copy of the DSN; the DSN cmd/start.go uses is not tested (P2)",
+    "CH-3": "the config validation of the address is tested; the refusal of the signing key's own address is in cmd/start.go and is not (P2)",
+    "CT-9": "where each pool starts is tested; unique addresses, a full pool and a released address are not (P2)"
+  },
+  "manual": {}
+}

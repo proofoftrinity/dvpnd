@@ -34,6 +34,7 @@ func renderConfig(t *testing.T, cfg *wgtypes.Config) string {
 	return buf.String()
 }
 
+// Rules: [CT-9].
 func TestTunnelAddress(t *testing.T) {
 	v4, _ := wgtypes.NewIPv4PoolFromCIDR("10.9.0.2/24")
 	v6, _ := wgtypes.NewIPv6PoolFromCIDR("fd86:ea04:1116::2/120")
@@ -46,6 +47,7 @@ func TestTunnelAddress(t *testing.T) {
 	}
 }
 
+// Rules: [RT-8].
 func TestConfigTemplateForwardRules(t *testing.T) {
 	cfg := wgtypes.NewConfig().WithDefaultValues()
 	cfg.ListenPort = 51820

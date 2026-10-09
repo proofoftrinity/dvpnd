@@ -12,6 +12,7 @@ import (
 	wgtypes "github.com/trinitystake/dvpnd/v9/services/wireguard/types"
 )
 
+// Rules: [CT-5].
 func TestParsePeerRequest(t *testing.T) {
 	key, err := wgtypes.NewPrivateKey()
 	if err != nil {
@@ -33,6 +34,7 @@ func TestParsePeerRequest(t *testing.T) {
 	}
 }
 
+// Rules: [CT-3], [CT-4].
 func TestHandshakePayload(t *testing.T) {
 	s := NewVariant(Default, nil)
 	binary.BigEndian.PutUint16(s.info, 51820)
@@ -74,6 +76,8 @@ func TestHandshakePayload(t *testing.T) {
 
 // The mirror of the proxy case: a client that speaks a proxy protocol reaches
 // a tunnel node and sends a uuid. The refusal must name what this node speaks.
+//
+// Rules: [HS-11].
 func TestParsePeerRequestExplainsTheProtocolMismatch(t *testing.T) {
 	s := NewVariant(Default, nil)
 

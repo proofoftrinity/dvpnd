@@ -80,6 +80,7 @@ func TestBandwidthConfigRoundTrip(t *testing.T) {
 	}
 }
 
+// Rules: [CT-13].
 func TestGeoIPConfigValidate(t *testing.T) {
 	if c := NewGeoIPConfig().WithDefaultValues(); c.Provider != geoip.ProviderAuto {
 		t.Fatalf("default provider is %q, want auto", c.Provider)
@@ -135,6 +136,7 @@ func TestConfigTemplateRenders(t *testing.T) {
 	}
 }
 
+// Rules: [PV-7].
 func TestConfigRedacted(t *testing.T) {
 	c := NewConfig().WithDefaultValues()
 	c.GeoIP.Provider = "ipinfo"
@@ -153,6 +155,7 @@ func TestConfigRedacted(t *testing.T) {
 	}
 }
 
+// Rules: [PV-8].
 func TestHandshakeResolverOffByDefault(t *testing.T) {
 	if NewConfig().WithDefaultValues().Handshake.Enable {
 		t.Fatal("the Handshake resolver needs hnsd, which is not installed with the node; it must be off by default")
@@ -162,6 +165,8 @@ func TestHandshakeResolverOffByDefault(t *testing.T) {
 // TestEgressSMTPBlockedByDefault: a config.toml without [egress], as every
 // node had before the section existed, keeps port 25 blocked; the operator's
 // opt-in survives a round trip.
+//
+// Rules: [EG-4], [RT-9].
 func TestEgressSMTPBlockedByDefault(t *testing.T) {
 	if NewConfig().WithDefaultValues().Egress.AllowSMTP {
 		t.Fatal("SMTP must be blocked by default")
@@ -199,6 +204,8 @@ func TestEgressSMTPBlockedByDefault(t *testing.T) {
 
 // TestRPCAddressesNeedTLS: the node trusts what its RPC answers, so plain
 // http is accepted only for an RPC on the same host.
+//
+// Rules: [CH-1].
 func TestRPCAddressesNeedTLS(t *testing.T) {
 	for addr, ok := range map[string]bool{
 		"https://rpc.example.com:443":                 true,
@@ -217,6 +224,7 @@ func TestRPCAddressesNeedTLS(t *testing.T) {
 	}
 }
 
+// Rules: [CH-3].
 func TestKeyringGranter(t *testing.T) {
 	c := NewKeyringConfig().WithDefaultValues()
 	if c.Granter != "" || c.Validate() != nil {

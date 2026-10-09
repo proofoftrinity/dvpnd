@@ -92,6 +92,8 @@ func index(t *testing.T, calls []string, call string) int {
 // TestStartFiltersBeforeTheInterfaceComesUp: the egress chains are filled
 // and jumped to before wg-quick brings the interface up, and taken away only
 // after it is down, so no peer packet passes unfiltered.
+//
+// Rules: [EG-7].
 func TestStartFiltersBeforeTheInterfaceComesUp(t *testing.T) {
 	s, calls := startRig(t, "wgtest0", false)
 
@@ -129,6 +131,8 @@ func TestStartFiltersBeforeTheInterfaceComesUp(t *testing.T) {
 
 // TestFailedStartRemovesTheFirewall: when the interface cannot come up the
 // chains do not outlive the attempt.
+//
+// Rules: [EG-7].
 func TestFailedStartRemovesTheFirewall(t *testing.T) {
 	s, calls := startRig(t, "wgtest1", true)
 

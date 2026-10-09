@@ -109,6 +109,7 @@ const (
 	bodyIPify       = `{"ip":"203.0.113.7"}`
 )
 
+// Rules: [CT-13].
 func TestParse(t *testing.T) {
 	cases := []struct {
 		name, provider, body string
@@ -154,6 +155,7 @@ func TestParse(t *testing.T) {
 	}
 }
 
+// Rules: [CT-13].
 func TestFetch(t *testing.T) {
 	f := newFake(t)
 	f.set(ProviderIPInfo, reply{body: `{"ip":"203.0.113.7","country":"Italy","country_code":"IT"}`})
@@ -194,6 +196,7 @@ func TestFetch(t *testing.T) {
 	}
 }
 
+// Rules: [CT-13].
 func TestLocationAuto(t *testing.T) {
 	full := types.GeoIPLocation{IP: "203.0.113.7", City: "Milan", Country: "Italy", CountryCode: "IT", Latitude: 45.46, Longitude: 9.19}
 
@@ -359,6 +362,7 @@ func TestLocationAuto(t *testing.T) {
 	})
 }
 
+// Rules: [CT-13].
 func TestLocationStaticOverrides(t *testing.T) {
 	t.Run("none with every static field", func(t *testing.T) {
 		loc, err := Location(Options{Provider: ProviderNone, IP: "198.51.100.9", City: "Turin", Country: "Italy", Latitude: 45.07, Longitude: 7.69})
@@ -464,6 +468,7 @@ func TestLocationStaticOverrides(t *testing.T) {
 	}
 }
 
+// Rules: [CT-13].
 func TestLocationURLOverride(t *testing.T) {
 	f := newFake(t)
 	f.set("custom", reply{body: bodyIPWhois})

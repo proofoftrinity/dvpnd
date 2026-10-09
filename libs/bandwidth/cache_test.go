@@ -43,6 +43,7 @@ func goodProber() *fakeProber {
 	}}
 }
 
+// Rules: [CT-12].
 func TestMeasurementIsStoredAndReused(t *testing.T) {
 	home := t.TempDir()
 	p := goodProber()
@@ -74,6 +75,7 @@ func TestMeasurementIsStoredAndReused(t *testing.T) {
 	}
 }
 
+// Rules: [CT-12].
 func TestStaleOrForeignCacheIsMeasuredAgain(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -106,6 +108,8 @@ func TestStaleOrForeignCacheIsMeasuredAgain(t *testing.T) {
 // A restart during a speed-test outage must not turn a fast node into one
 // that advertises nothing: an old measurement for the same address is reused,
 // however old, and the operator is told.
+//
+// Rules: [CT-12].
 func TestFailedMeasurementFallsBackToOldCache(t *testing.T) {
 	home := t.TempDir()
 	old := cacheEntry{IP: "203.0.113.10", Upload: 111, Download: 222, MeasuredAt: time.Now().Add(-30 * 24 * time.Hour)}
@@ -127,6 +131,7 @@ func TestFailedMeasurementFallsBackToOldCache(t *testing.T) {
 	}
 }
 
+// Rules: [CT-12].
 func TestFailedMeasurementWithoutCacheGivesNone(t *testing.T) {
 	defer stubProber(func(Options) prober { return &fakeProber{listErr: context.DeadlineExceeded} })()
 	log := &recorder{}
@@ -141,6 +146,7 @@ func TestFailedMeasurementWithoutCacheGivesNone(t *testing.T) {
 	}
 }
 
+// Rules: [CT-12].
 func TestCorruptCacheIsIgnored(t *testing.T) {
 	home := t.TempDir()
 	if err := os.WriteFile(filepath.Join(home, cacheFileName), []byte("{not json"), 0600); err != nil {
@@ -163,6 +169,7 @@ func TestCorruptCacheIsIgnored(t *testing.T) {
 	}
 }
 
+// Rules: [CT-12].
 func TestDeclaredLinkLeavesCacheAlone(t *testing.T) {
 	home := t.TempDir()
 	defer stubProber(func(Options) prober { return goodProber() })()
@@ -174,6 +181,7 @@ func TestDeclaredLinkLeavesCacheAlone(t *testing.T) {
 	}
 }
 
+// Rules: [CT-12].
 func TestNoHomeDisablesCache(t *testing.T) {
 	p := goodProber()
 	defer stubProber(func(Options) prober { return p })()

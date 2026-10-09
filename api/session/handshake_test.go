@@ -32,6 +32,7 @@ func signedBody(t *testing.T, priv *secp256k1.PrivKey, id uint64, peer interface
 	}
 }
 
+// Rules: [HS-1].
 func TestVerifyHandshake(t *testing.T) {
 	priv := secp256k1.GenPrivKey()
 	body := signedBody(t, priv, 59840883, map[string]string{"public_key": "abc"})

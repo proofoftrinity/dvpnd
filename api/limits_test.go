@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// Rules: [HS-10].
 func TestLimitBody(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

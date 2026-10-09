@@ -207,6 +207,7 @@ func TestInitRendersRealityConfig(t *testing.T) {
 	}
 }
 
+// Rules: [RT-6].
 func TestInitRequiresBinary(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
 	saved := binaryName
@@ -219,6 +220,7 @@ func TestInitRequiresBinary(t *testing.T) {
 	}
 }
 
+// Rules: [SL-1], [CT-10].
 func TestPeersOverTheAPI(t *testing.T) {
 	api, port := startFakeAPI(t)
 
@@ -283,6 +285,7 @@ func TestPeersOverTheAPI(t *testing.T) {
 	}
 }
 
+// Rules: [RT-3].
 func TestStartStop(t *testing.T) {
 	stubBinary(t)
 	dir, _ := home(t, xraytypes.SecurityTLS)
@@ -303,6 +306,7 @@ func TestStartStop(t *testing.T) {
 	}
 }
 
+// Rules: [CT-3], [CT-4].
 func TestHandshakePayload(t *testing.T) {
 	stubBinary(t)
 
@@ -351,6 +355,8 @@ func mustPayload(t *testing.T, s *XRay) interface{} {
 
 // TestLogLevelFollowsNodeLogLevel: xray's warnings carry client addresses and
 // destinations, so they are kept only when the node runs at debug itself.
+//
+// Rules: [PV-2].
 func TestLogLevelFollowsNodeLogLevel(t *testing.T) {
 	stubBinary(t)
 	t.Cleanup(func() { common.SetVerbose(false) })
@@ -443,6 +449,8 @@ func routingRules(t *testing.T, dir string) (map[string]interface{}, map[string]
 // TestInitRendersEgressPolicy: a client cannot reach the blocked networks,
 // loopback by name (the control API first of all), or port 25 unless the
 // operator allows it.
+//
+// Rules: [EG-1], [EG-4], [EG-5].
 func TestInitRendersEgressPolicy(t *testing.T) {
 	stubBinary(t)
 	t.Cleanup(func() { common.SetEgress(common.Egress{}) })

@@ -10,6 +10,7 @@ import (
 	"testing"
 )
 
+// Rules: [CT-4].
 func TestPKICreateLoadIssue(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "openvpn")
 

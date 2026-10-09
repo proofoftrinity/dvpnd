@@ -1,0 +1,24 @@
+{
+  "docs": ["docs/invariants/*.md"],
+  "homes": {
+    "EG": "docs/invariants/egress.md",
+    "HS": "docs/invariants/handshake.md",
+    "SL": "docs/invariants/sessions.md",
+    "PV": "docs/invariants/privacy.md",
+    "CH": "docs/invariants/chain.md",
+    "RT": "docs/invariants/runtime.md",
+    "CT": "docs/invariants/contract.md",
+    "LIC": "docs/invariants/provenance.md"
+  },
+  "ruleDocs": ["docs/invariants/*.md"],
+  "tests": [
+    { "glob": "**/*_test.go", "lang": "go" }
+  ],
+  "tiers": {
+    "integration": "make check-integration, and the Integration suite job in CI"
+  },
+  "citesOnly": ["invariants/canaries.json"],
+  "status": "invariants/status.json",
+  "minimums": { "testFiles": 55, "rules": 86, "pinned": 70 },
+  "verify": "make verify"
+}

@@ -14,6 +14,7 @@ import (
 	"time"
 )
 
+// Rules: [CT-4].
 func TestSelfSignedCertificateAndPin(t *testing.T) {
 	certPEM, keyPEM, err := SelfSignedCertificate("dvpnd", time.Hour)
 	if err != nil {

@@ -9,6 +9,7 @@ import (
 	"gorm.io/gorm"
 )
 
+// Rules: [SL-2].
 func TestSessionServedBytesAndDuration(t *testing.T) {
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	s := Session{

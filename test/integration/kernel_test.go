@@ -23,6 +23,8 @@ import (
 // daemon checks it and to a private one when it dials (DNS rebinding). The
 // same dials first run without the chain, so the test cannot pass on a
 // network where the blocked destinations are unreachable anyway.
+//
+// Rules: [EG-6].
 func TestProxyAccountChain(t *testing.T) {
 	requireEnv(t)
 
@@ -80,6 +82,8 @@ func TestProxyAccountChain(t *testing.T) {
 // real iptables and ip6tables, which must take every rule, twice in a row
 // (a node that died without removing them starts again), and leave nothing
 // behind.
+//
+// Rules: [EG-9], [RT-7].
 func TestTunnelEgressRules(t *testing.T) {
 	requireEnv(t)
 

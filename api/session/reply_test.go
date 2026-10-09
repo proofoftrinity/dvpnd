@@ -54,6 +54,7 @@ func verifyReply(t *testing.T, header string, id uint64, request []byte, result 
 	return pub.VerifySignature(replyDigest(id, request, reply, result.Addrs), rawSig)
 }
 
+// Rules: [HS-5].
 func TestSignedReply(t *testing.T) {
 	signer := nodeSigner(t)
 	request := []byte(`{"public_key":"abc"}`)
@@ -112,6 +113,8 @@ func signerPubKey(t *testing.T, c *lite.Client) ([]byte, error) {
 // specifies, computed outside Go: clients verify against the spec, so any
 // change to the digest breaks every client that checks it. tools/e2e checks
 // the same vector with its own implementation.
+//
+// Rules: [HS-6].
 func TestReplyDigestVector(t *testing.T) {
 	got := replyDigest(42, []byte(`{"public_key":"abc"}`),
 		[]byte(`{"addrs":["10.8.0.2/32"],"metadata":[{"port":51820}]}`),

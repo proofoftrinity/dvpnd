@@ -28,6 +28,7 @@ func (f fakeSession) GetStatus() v1base.Status      { return f.status }
 func (f fakeSession) GetUploadBytes() sdkmath.Int   { return sdkmath.NewInt(f.upload) }
 func (f fakeSession) GetDownloadBytes() sdkmath.Int { return sdkmath.NewInt(f.downld) }
 
+// Rules: [SL-14].
 func TestSessionNeedsReport(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -51,6 +52,7 @@ func TestSessionNeedsReport(t *testing.T) {
 	}
 }
 
+// Rules: [SL-14].
 func TestClearSessions(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{Logger: gormlogger.Discard})
 	if err != nil {
@@ -85,6 +87,8 @@ func TestClearSessions(t *testing.T) {
 // from the bytes on disk. A file opened with secure_delete is clean at once;
 // one written without it (by an earlier release) still holds them until
 // compactDatabase runs.
+//
+// Rules: [PV-4].
 func TestDeletedSessionsLeaveNoTrace(t *testing.T) {
 	const address, key = "sent1tracemarkeraddress", "tracemarkerpeerkey"
 

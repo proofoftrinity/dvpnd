@@ -10,6 +10,8 @@ import (
 // A refusal has to explain itself in the node's log. The case that prompted
 // this: a client that only speaks WireGuard reaches a Hysteria2 node and sends
 // public_key, and "uuid is missing" alone left the operator to work that out.
+//
+// Rules: [HS-11].
 func TestUUIDPeerRequestExplainsTheProtocolMismatch(t *testing.T) {
 	cases := []struct {
 		name     string
@@ -62,6 +64,7 @@ func TestUUIDPeerRequestExplainsTheProtocolMismatch(t *testing.T) {
 	}
 }
 
+// Rules: [CT-5].
 func TestUUIDPeerRequestAcceptsBothForms(t *testing.T) {
 	const canonical = "3f2504e0-4f89-41d3-9a0c-0305e82c3301"
 

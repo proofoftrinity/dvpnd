@@ -47,6 +47,7 @@ func home(t *testing.T, proto string, ipv6 bool) (string, *ovpntypes.Config) {
 	return dir, cfg
 }
 
+// Rules: [CT-3].
 func TestInitRendersServerConfig(t *testing.T) {
 	stubBinary(t)
 	dir, _ := home(t, ovpntypes.ProtoUDP, true)
@@ -101,6 +102,7 @@ func TestInitRendersServerConfig(t *testing.T) {
 	}
 }
 
+// Rules: [RT-6].
 func TestInitRequiresBinary(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
 	saved := binaryName
@@ -113,6 +115,7 @@ func TestInitRequiresBinary(t *testing.T) {
 	}
 }
 
+// Rules: [SL-1], [CT-4].
 func TestPeersAndHandshake(t *testing.T) {
 	stubBinary(t)
 	dir, _ := home(t, ovpntypes.ProtoUDP, true)
@@ -225,6 +228,7 @@ func TestPeersAndHandshake(t *testing.T) {
 	}
 }
 
+// Rules: [EG-7], [RT-3].
 func TestStartStop(t *testing.T) {
 	stubBinary(t)
 	dir, _ := home(t, ovpntypes.ProtoUDP, false)
@@ -300,6 +304,8 @@ func TestStartStop(t *testing.T) {
 
 // TestVerbFollowsNodeLogLevel: OpenVPN logs every client's address at its
 // usual verb 3, so the node asks for that only when it runs at debug itself.
+//
+// Rules: [PV-2].
 func TestVerbFollowsNodeLogLevel(t *testing.T) {
 	stubBinary(t)
 	t.Cleanup(func() { common.SetVerbose(false) })

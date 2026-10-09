@@ -8,6 +8,7 @@ import (
 	"testing"
 )
 
+// Rules: [CT-5].
 func TestParsePeerRequest(t *testing.T) {
 	s := NewV2Ray()
 
@@ -32,6 +33,7 @@ func TestParsePeerRequest(t *testing.T) {
 	}
 }
 
+// Rules: [CT-3], [CT-4].
 func TestMetadataAndPayload(t *testing.T) {
 	s := NewV2Ray()
 	binary.BigEndian.PutUint16(s.info, 8443)

@@ -9,6 +9,8 @@ import (
 
 // The root document must carry the keys current client apps and aggregators
 // read, in the layout nodes on the network answer with.
+//
+// Rules: [CT-2].
 func TestRootDocumentLayout(t *testing.T) {
 	doc := &ResponseGetRoot{
 		Addr:            "sentnode1example",
@@ -53,6 +55,8 @@ func TestRootDocumentLayout(t *testing.T) {
 
 // The legacy status document says where its bandwidth figure came from, the
 // way its location says which service geolocated the node.
+//
+// Rules: [CT-2].
 func TestStatusBandwidthCarriesSource(t *testing.T) {
 	out, err := json.Marshal(ResponseGetStatus{
 		Bandwidth: &Bandwidth{Download: 125000000, Upload: 125000000, Source: "config"},

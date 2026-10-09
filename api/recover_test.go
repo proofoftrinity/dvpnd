@@ -19,6 +19,8 @@ import (
 // TestRecoverPanics: a handler that panics gets the client a 500 with the
 // generic message and the operator a log line with the panic, and the
 // request's headers go nowhere.
+//
+// Rules: [HS-9].
 func TestRecoverPanics(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

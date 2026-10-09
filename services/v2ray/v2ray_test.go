@@ -59,6 +59,7 @@ func startStub(t *testing.T, body string) *V2Ray {
 	}
 }
 
+// Rules: [RT-6].
 func TestInitRequiresBinaryOnPath(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
 
@@ -72,6 +73,7 @@ func TestInitRequiresBinaryOnPath(t *testing.T) {
 	}
 }
 
+// Rules: [RT-3].
 func TestStopTerminatesChild(t *testing.T) {
 	s := startStub(t, "trap 'exit 0' TERM")
 
@@ -87,6 +89,7 @@ func TestStopTerminatesChild(t *testing.T) {
 	}
 }
 
+// Rules: [RT-3].
 func TestStopKillsChildThatIgnoresTerm(t *testing.T) {
 	saved := stopTimeout
 	stopTimeout = 300 * time.Millisecond
@@ -101,6 +104,7 @@ func TestStopKillsChildThatIgnoresTerm(t *testing.T) {
 	}
 }
 
+// Rules: [RT-3].
 func TestStopWithoutStart(t *testing.T) {
 	if err := NewV2Ray().Stop(); err == nil {
 		t.Fatal("Stop before Start must fail")
@@ -110,6 +114,8 @@ func TestStopWithoutStart(t *testing.T) {
 // TestInitRendersEgressPolicy: a client cannot reach the blocked networks,
 // loopback by name (the control API first of all), or port 25 unless the
 // operator allows it; the control API is on the configured port.
+//
+// Rules: [EG-1], [EG-4], [EG-5].
 func TestInitRendersEgressPolicy(t *testing.T) {
 	stub(t, "trap 'exit 0' TERM")
 	t.Cleanup(func() { common.SetEgress(common.Egress{}) })
@@ -188,6 +194,8 @@ func TestInitRendersEgressPolicy(t *testing.T) {
 
 // TestConfigWithoutAPISection: a v2ray.toml written before [api] existed
 // still starts, on a random API port.
+//
+// Rules: [RT-9].
 func TestConfigWithoutAPISection(t *testing.T) {
 	path := filepath.Join(t.TempDir(), v2raytypes.ConfigFileName)
 	old := "[vmess]\nlisten_port = 8443\ntls = false\ntransport = \"tcp\"\n"

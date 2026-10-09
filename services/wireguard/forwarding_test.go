@@ -9,6 +9,7 @@ import (
 	"testing"
 )
 
+// Rules: [RT-4].
 func TestEnsureForwarding(t *testing.T) {
 	saved := forwardingSwitches
 	t.Cleanup(func() { forwardingSwitches = saved })
@@ -56,15 +57,24 @@ func TestEnsureForwarding(t *testing.T) {
 	if got := read(v4); got != "1" {
 		t.Fatalf("ip_forward = %q, want 1", got)
 	}
+}
 
-	// Off and not writable (a container without --sysctl): a clear error.
+// TestEnsureForwardingReadOnlyAndOff: a switch that is off and cannot be
+// written (a container started without --sysctl) gives an error that says
+// what to add. Root ignores file modes, so this case runs only as a user.
+//
+// Rules: [RT-4].
+func TestEnsureForwardingReadOnlyAndOff(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("root ignores file modes")
 	}
-	if err := os.WriteFile(v4, []byte("0\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chmod(v4, 0o444); err != nil {
+	saved := forwardingSwitches
+	t.Cleanup(func() { forwardingSwitches = saved })
+
+	v4 := filepath.Join(t.TempDir(), "ip_forward")
+	forwardingSwitches = []forwardingSwitch{{v4, "net.ipv4.ip_forward", true}}
+
+	if err := os.WriteFile(v4, []byte("0\n"), 0o444); err != nil {
 		t.Fatal(err)
 	}
 	err := EnsureForwarding()

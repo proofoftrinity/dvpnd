@@ -143,6 +143,7 @@ func waitFor(t *testing.T, what string, cond func() bool) {
 	}
 }
 
+// Rules: [SL-16].
 func TestManagementAdmitStatusKill(t *testing.T) {
 	f := startFakeServer(t)
 	f.clients = []clientStatus{{commonName: "peer-a", received: 100, sent: 2000, cid: "7"}}

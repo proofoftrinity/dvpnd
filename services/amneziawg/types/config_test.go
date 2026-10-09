@@ -91,6 +91,7 @@ func TestDefaultsValidateAndRoundTrip(t *testing.T) {
 	}
 }
 
+// Rules: [CT-7], [RT-9].
 func TestReadInConfigWithoutV3Section(t *testing.T) {
 	c := NewConfig().WithDefaultValues()
 	older, _, _ := strings.Cut(c.String(), "[v3]")
@@ -113,6 +114,7 @@ func TestReadInConfigWithoutV3Section(t *testing.T) {
 	}
 }
 
+// Rules: [CT-7].
 func TestObfuscationValidation(t *testing.T) {
 	cases := []struct {
 		name string
@@ -145,6 +147,7 @@ func TestObfuscationValidation(t *testing.T) {
 	}
 }
 
+// Rules: [CT-7].
 func TestV3Validation(t *testing.T) {
 	cases := []struct {
 		name string

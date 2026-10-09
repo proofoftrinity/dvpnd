@@ -25,6 +25,7 @@ func public(t *testing.T, private string) []byte {
 	return key.Public().Bytes()
 }
 
+// Rules: [CT-8].
 func TestDeriveNetworks(t *testing.T) {
 	seen := make(map[string]bool)
 	for i := 0; i < 200; i++ {
@@ -51,6 +52,7 @@ func TestDeriveNetworks(t *testing.T) {
 	}
 }
 
+// Rules: [CT-9].
 func TestNetworksPool(t *testing.T) {
 	_, v4, _ := net.ParseCIDR("10.20.30.0/24")
 	_, v6, _ := net.ParseCIDR("fd01:2:3::/120")
@@ -61,6 +63,7 @@ func TestNetworksPool(t *testing.T) {
 	}
 }
 
+// Rules: [CT-8].
 func TestTunnelNetworks(t *testing.T) {
 	c := NewConfig().WithDefaultValues()
 
@@ -105,6 +108,7 @@ func TestTunnelNetworks(t *testing.T) {
 	}
 }
 
+// Rules: [CT-8].
 func TestSubnetSettingsRoundTrip(t *testing.T) {
 	c := NewConfig().WithDefaultValues()
 	c.IPv4Subnet, c.IPv6Subnet = "10.44.55.0/24", "fd44:55::/120"
@@ -140,6 +144,7 @@ func TestSubnetSettingsRoundTrip(t *testing.T) {
 	}
 }
 
+// Rules: [CT-8].
 func TestSubnetValidation(t *testing.T) {
 	for _, tc := range []struct {
 		v4, v6 string

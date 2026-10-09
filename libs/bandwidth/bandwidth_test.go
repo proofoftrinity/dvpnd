@@ -117,6 +117,7 @@ func srv(id, sponsor, city string, latency time.Duration, downMbps, upMbps float
 
 func mbps(bytesPerSecond int64) float64 { return Mbps(float64(bytesPerSecond)) }
 
+// Rules: [CT-11].
 func TestBytesPerSecond(t *testing.T) {
 	cases := []struct {
 		mbps float64
@@ -136,6 +137,8 @@ func TestBytesPerSecond(t *testing.T) {
 // in well under a millisecond and reports the local network's throughput. It
 // must never be measured, the operator must be told why, and the figure must
 // come from the servers that are genuinely off the host's network.
+//
+// Rules: [CT-11].
 func TestSameFacilityServerIsRejected(t *testing.T) {
 	p := &fakeProber{servers: []fakeServer{
 		srv("near", "Cloud Tenant", "Sametown", 500*time.Microsecond, 9000, 8000),
@@ -167,6 +170,7 @@ func TestSameFacilityServerIsRejected(t *testing.T) {
 	}
 }
 
+// Rules: [CT-11].
 func TestAgreementStopsAfterTwoServers(t *testing.T) {
 	p := &fakeProber{servers: []fakeServer{
 		srv("a", "A", "One", 10*time.Millisecond, 950, 940),
@@ -186,6 +190,8 @@ func TestAgreementStopsAfterTwoServers(t *testing.T) {
 
 // One server on the host's network that somehow cleared the floor reads far
 // higher than the rest; taking the lowest independent figure discards it.
+//
+// Rules: [CT-11].
 func TestDisagreementMeasuresThirdServerAndTakesLowest(t *testing.T) {
 	p := &fakeProber{servers: []fakeServer{
 		srv("a", "A", "One", 5*time.Millisecond, 7000, 6000),
@@ -209,6 +215,8 @@ func TestDisagreementMeasuresThirdServerAndTakesLowest(t *testing.T) {
 // direction, and the operator override exists for when it matters. Here the
 // first two servers disagree (400 against 940), so a third is measured, and the
 // lowest of the three stands.
+//
+// Rules: [CT-11].
 func TestWeakServerUnderstatesRatherThanOverstates(t *testing.T) {
 	p := &fakeProber{servers: []fakeServer{
 		srv("a", "A", "One", 10*time.Millisecond, 940, 930),
@@ -225,6 +233,8 @@ func TestWeakServerUnderstatesRatherThanOverstates(t *testing.T) {
 
 // Upload and download are combined separately, so each direction's figure may
 // come from a different server.
+//
+// Rules: [CT-11].
 func TestDirectionsAreCombinedIndependently(t *testing.T) {
 	p := &fakeProber{servers: []fakeServer{
 		srv("a", "A", "One", 10*time.Millisecond, 950, 300), // receives badly
@@ -245,6 +255,8 @@ func TestDirectionsAreCombinedIndependently(t *testing.T) {
 
 // The floor is applied to the minimum round-trip time, not the mean: jitter
 // lifts a mean, but a minimum below the floor means the server is too close.
+//
+// Rules: [CT-11].
 func TestFloorUsesMinimumLatency(t *testing.T) {
 	jittery := srv("j", "Metro ISP", "Sametown", 2500*time.Microsecond, 5000, 4000)
 	jittery.min = 1200 * time.Microsecond
@@ -268,6 +280,8 @@ func TestFloorUsesMinimumLatency(t *testing.T) {
 
 // In a dense market the ten nearest servers can all be inside the metropolitan
 // area; the next batch is refined before the floor is relaxed.
+//
+// Rules: [CT-11].
 func TestRefinesNextBatchWhenNearestAreAllTooClose(t *testing.T) {
 	var servers []fakeServer
 	for i := 0; i < 12; i++ {
@@ -295,6 +309,7 @@ func TestRefinesNextBatchWhenNearestAreAllTooClose(t *testing.T) {
 	}
 }
 
+// Rules: [CT-11].
 func TestOneServerPerSponsorAndCity(t *testing.T) {
 	p := &fakeProber{servers: []fakeServer{
 		srv("a1", "Same Corp", "Onecity", 10*time.Millisecond, 950, 940),
@@ -314,6 +329,8 @@ func TestOneServerPerSponsorAndCity(t *testing.T) {
 
 // The library reports -1 when it could not measure; that is a failure, never a
 // figure.
+//
+// Rules: [CT-11].
 func TestNoResultSampleIsSkipped(t *testing.T) {
 	bad := srv("a", "A", "One", 10*time.Millisecond, 0, 0)
 	bad.down, bad.up = -1, -1
@@ -336,6 +353,7 @@ func TestNoResultSampleIsSkipped(t *testing.T) {
 	}
 }
 
+// Rules: [CT-11].
 func TestRelaxedFloorWhenNothingLeavesTheMetro(t *testing.T) {
 	p := &fakeProber{servers: []fakeServer{
 		srv("a", "A", "One", 600*time.Microsecond, 9000, 8000),
@@ -359,6 +377,7 @@ func TestRelaxedFloorWhenNothingLeavesTheMetro(t *testing.T) {
 	}
 }
 
+// Rules: [CT-11].
 func TestRefusesWhenEveryServerIsInTheFacility(t *testing.T) {
 	p := &fakeProber{servers: []fakeServer{
 		srv("a", "A", "One", 300*time.Microsecond, 9000, 8000),
@@ -379,6 +398,7 @@ func TestRefusesWhenEveryServerIsInTheFacility(t *testing.T) {
 	}
 }
 
+// Rules: [CT-11].
 func TestDegenerateCasesGiveNone(t *testing.T) {
 	unreachable := srv("a", "A", "One", 10*time.Millisecond, 900, 900)
 	unreachable.c.Latency = -1
@@ -410,6 +430,7 @@ func TestDegenerateCasesGiveNone(t *testing.T) {
 	}
 }
 
+// Rules: [CT-11].
 func TestCancelledContextStopsMeasuring(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -424,6 +445,7 @@ func TestCancelledContextStopsMeasuring(t *testing.T) {
 	}
 }
 
+// Rules: [CT-11].
 func TestMinSample(t *testing.T) {
 	cases := []struct {
 		in   []float64
@@ -441,6 +463,8 @@ func TestMinSample(t *testing.T) {
 }
 
 // Measure, the public entry point: the declared link wins without any probing.
+//
+// Rules: [CT-11].
 func TestDeclaredLinkSkipsMeasurement(t *testing.T) {
 	called := false
 	defer stubProber(func(Options) prober { called = true; return &fakeProber{} })()

@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/viper"
 )
 
+// Rules: [PV-6].
 func TestWritePrivateFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.toml")
 	if err := os.WriteFile(path, []byte("old"), 0o644); err != nil {
@@ -30,6 +31,8 @@ func TestWritePrivateFile(t *testing.T) {
 
 // TestTOMLStringKeepsAValueOneValue: whatever an operator passes to
 // "config set", it reads back as the same single value.
+//
+// Rules: [PV-6].
 func TestTOMLStringKeepsAValueOneValue(t *testing.T) {
 	for _, v := range []string{
 		"plain",

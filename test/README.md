@@ -1,19 +1,23 @@
 # Regression suite
 
-Two gates every change goes through. They state what dvpnd must keep doing; a
+The gates every change goes through. They state what dvpnd must keep doing; a
 refactor or an update that breaks one of them is a regression, whatever else
-it improves.
+it improves. The rules themselves are written down in `docs/invariants/`, each
+with an ID, and every one is pinned by a test or listed with the reason it is
+not yet.
 
 | Gate | Command | Needs | Time |
 |---|---|---|---|
-| Fast | `make check` | Go | under a minute |
+| Fast | `make check` | Go, Python 3 | about two minutes |
+| Canaries | `make check-canaries` | Go, Python 3 | seconds once the build cache is warm; two minutes the first time |
+| Both | `make verify` | | what every commit passes |
 | Integration | `make check-integration` | Go, Docker, the internet | about ten minutes, most of it the first image build |
 
-`make check-all` runs both.
+`make check-all` runs all of them.
 
 ## When to run what
 
-- **Every change** passes `make check` before it is committed.
+- **Every change** passes `make verify` before it is committed.
 - **A change to a service, the egress policy, the runtime directory or the
   proxy account, the Dockerfile, `scripts/runner.sh` or `scripts/dvpnd.service`**
   also passes `make check-integration`, as does every release.
@@ -23,18 +27,77 @@ it improves.
   with every change, and a test is never weakened to let a change through: if
   the behaviour is meant to change, the test changes in the same commit, and
   the commit says why.
+- **A refactor that turns a test red is wrong** until shown otherwise.
 
 ## Fast gate: `make check`
 
+- the rule registry (below);
 - `gofmt`, `go vet` (the integration package included, so it always compiles);
-- every unit test with the race detector. Unit tests never touch the network,
-  the chain or the host's firewall: iptables, the daemons' control APIs and
-  the chain are faked;
+- every unit test with the race detector, in shuffled order. Unit tests never
+  touch the network, the chain or the host's firewall: iptables, the daemons'
+  control APIs and the chain are faked;
 - an SPDX header on every Go file, no dependency on `sentinel-go-sdk`, and
   `docs/provenance/verify-fork.sh`.
 
-CI runs the same checks on every push and pull request
+CI runs the same checks, and the canaries, on every push and pull request
 (`.github/workflows/ci.yml`).
+
+## Rules and the registry
+
+`docs/invariants/` holds the rules, one file per area, each rule a bold
+sentence with an ID and the reason it exists:
+
+| Prefix | File | Area |
+|---|---|---|
+| `EG` | `egress.md` | what a client can reach through the node |
+| `HS` | `handshake.md` | who gets a peer, and what the node answers |
+| `SL` | `sessions.md` | sessions and usage: what the node is paid on |
+| `PV` | `privacy.md` | what the node keeps about clients and the operator |
+| `CH` | `chain.md` | how the node talks to the chain and signs |
+| `RT` | `runtime.md` | how the node runs the daemons, and what it leaves behind |
+| `CT` | `contract.md` | what client apps and aggregators read from the node |
+| `LIC` | `provenance.md` | what keeps the fork's legal position answerable |
+
+A test pins a rule by carrying its ID in the comment directly above
+`func TestX` (`// Rules: [SL-2].`) or in a literal `t.Run` name. A test that
+calls `t.Skip` may not run, so it cites the rule without pinning it; a test in
+`test/integration/` (build tag `integration`) pins it in the integration tier.
+
+`invariants/registry.py` runs first in `make check` and fails when:
+
+- a rule has no test that pins it and no entry in `invariants/status.json`;
+- an ID is defined twice, outside its prefix's file, or cited but not defined;
+- a top-level bold line in a rule doc carries no ID;
+- the scan finds fewer test files, rules or pinned rules than the minimums in
+  `invariants/config.json` (a broken glob must not pass everything).
+
+`status.json` lists what is not pinned yet: `pending` (no test; the reason
+says what will pin it), `partial` (pinned, with the part that is not) and
+`manual` (checkable only by hand or against a live system). Each entry needs
+a reason. `python3 invariants/registry.py --report` prints every rule and what
+pins it.
+
+IDs are never renumbered or reused: tests, canaries and commit messages point
+at them. A new rule takes the next free number in its file.
+
+## Canaries: `make check-canaries`
+
+A canary is one deliberate regression: `invariants/canaries.json` names a file,
+an exact piece of it to replace (it must occur once), and the test command
+that must fail. `invariants/canaries.py` applies each one to a copy of the tree
+(uncommitted changes included) and requires the run to fail with `--- FAIL`,
+so a mutation that only breaks the build does not count. A canary that
+survives means nothing guards its rule any more.
+
+- `caught`: the rule's test failed, as it must;
+- `SURVIVED`: every test passed with the rule broken;
+- `RE-AIM`: the code moved and the anchor no longer matches once. Re-aim it at
+  the moved code; never delete it;
+- `WRONG RED`: the command failed without a test failing (a build error).
+
+The copies build with `-trimpath`, so they share the Go build cache and only
+the mutated package is compiled again. Each money, root and privacy rule has a
+canary. `python3 invariants/canaries.py --only SL-2` runs one.
 
 ## Integration gate: `make check-integration`
 
@@ -79,6 +142,8 @@ WireGuard node in Docker.
 
 ## Adding a case
 
+- A rule: the next free ID in its `docs/invariants/` file, a test with the ID
+  above it, and a canary when it guards money, root or privacy.
 - A proxy protocol: a `proxyCase` in `test/integration/proxies_test.go` (how
   the node's configuration is written, how a client is built from the
   handshake entry).
