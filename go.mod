@@ -8,6 +8,7 @@ require (
 	github.com/cosmos/go-bip39 v1.0.0
 	github.com/gin-contrib/cors v1.7.9
 	github.com/gin-gonic/gin v1.12.0
+	github.com/go-viper/mapstructure/v2 v2.4.0
 	github.com/pkg/errors v0.9.1
 	github.com/rs/zerolog v1.35.1
 	github.com/showwin/speedtest-go v1.8.3
@@ -34,7 +35,6 @@ require (
 	github.com/cockroachdb/tokenbucket v0.0.0-20230807174530-cc333fc44b06 // indirect
 	github.com/cosmos/gogogateway v1.2.0 // indirect
 	github.com/dgraph-io/badger/v4 v4.2.0 // indirect
-	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/goccy/go-yaml v1.19.2 // indirect
 	github.com/gogo/googleapis v1.4.1 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect

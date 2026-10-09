@@ -36,6 +36,9 @@ not yet.
 - every unit test with the race detector, in shuffled order. Unit tests never
   touch the network, the chain or the host's firewall: iptables, the daemons'
   control APIs and the chain are faked;
+- `main_test.go`, which runs dvpnd itself in a child process: a command that
+  fails exits non-zero, and `config set` refuses a key its file does not have
+  but takes every key the installer and the Docker runner set;
 - `test/static/`: the rules about the repository itself and the shape of code
   a behaviour test cannot reach, read from the tree and git: the SPDX header
   first in every Go file, no `sentinel-go-sdk` in `go.mod`, `go.sum` or any

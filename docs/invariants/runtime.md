@@ -41,3 +41,7 @@ the node must not leave a tunnel, a rule or a process behind when it stops. IDs 
   build needs a `safe.directory` entry for the source tree, and an upgrade is a re-run:
   each run added another copy. A run leaves one entry for the tree, folds the copies
   earlier runs left into it, and keeps the operator's own entries.
+- **[RT-13] `config set` refuses a key its file does not have.** Viper accepts any key,
+  and the file was saved without it and the command exited 0: a misspelt key was lost
+  without a word, and the Docker runner stored the operator's prices under keys the node
+  no longer had, so the node it set up had no prices and refused to start.

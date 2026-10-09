@@ -110,9 +110,7 @@ func configSet() *cobra.Command {
 				return err
 			}
 
-			v.Set(args[0], args[1])
-
-			if err = v.Unmarshal(config); err != nil {
+			if err = types.SetConfigKey(v, config, args[0], args[1]); err != nil {
 				return err
 			}
 

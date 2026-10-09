@@ -4,10 +4,17 @@ package main
 
 import (
 	"errors"
+	"fmt"
+	"io/fs"
+	"maps"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/proofoftrinity/dvpnd/v9/services"
 )
 
 // mainArgs carries the arguments of a dvpnd run from a test to the child it
@@ -67,5 +74,148 @@ func TestFailingCommandExitsNonZero(t *testing.T) {
 		if status == 0 {
 			t.Errorf("dvpnd %v failed (%s) yet exited 0", args, strings.TrimSpace(out))
 		}
+	}
+}
+
+// setKey is a key a script sets with config set, and the line that sets it.
+type setKey struct{ key, at string }
+
+// installerSet matches a config set in the installer: the protocol named, or
+// the node type in a case arm, or none for the node's own file; then the key.
+// runnerSet matches one in the Docker runner, through its <protocol>_config_set
+// functions or config_set for the node's own file.
+var (
+	installerSet = regexp.MustCompile(`\bdv (?:("\$\{NODE_TYPE\}"|[a-z0-9]+) )?config set ([a-z0-9_.]+) `)
+	caseArm      = regexp.MustCompile(`^\s*([a-z0-9|]+)\)`)
+	runnerSet    = regexp.MustCompile(`^\s*(?:([a-z0-9]+)_)?config_set "([a-z0-9_.]+)"`)
+)
+
+// scriptKeys returns the keys the installer and the Docker runner set, by the
+// protocol whose file they are in, "" for the node's own.
+func scriptKeys(t *testing.T) map[string][]setKey {
+	t.Helper()
+	keys := map[string][]setKey{}
+	lines := func(file string) []string {
+		b, err := os.ReadFile(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		return strings.Split(string(b), "\n")
+	}
+
+	const installer = "scripts/install.sh"
+	var arm []string
+	for i, line := range lines(installer) {
+		if m := caseArm.FindStringSubmatch(line); m != nil {
+			arm = strings.Split(m[1], "|")
+		} else if strings.TrimSpace(line) == "esac" {
+			arm = nil
+		}
+		m := installerSet.FindStringSubmatch(line)
+		at := fmt.Sprintf("%s:%d", installer, i+1)
+		switch {
+		case m == nil:
+		case m[1] != `"${NODE_TYPE}"`:
+			keys[m[1]] = append(keys[m[1]], setKey{m[2], at})
+		case arm == nil:
+			t.Fatalf("%s sets %s for the node type outside a case arm naming it", at, m[2])
+		default:
+			for _, name := range arm {
+				keys[name] = append(keys[name], setKey{m[2], at})
+			}
+		}
+	}
+
+	const runner = "scripts/runner.sh"
+	for i, line := range lines(runner) {
+		if m := runnerSet.FindStringSubmatch(line); m != nil {
+			keys[m[1]] = append(keys[m[1]], setKey{m[2], fmt.Sprintf("%s:%d", runner, i+1)})
+		}
+	}
+
+	return keys
+}
+
+// files returns the contents of every file under dir by its path.
+func files(t *testing.T, dir string) map[string]string {
+	t.Helper()
+	got := map[string]string{}
+	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		b, err := os.ReadFile(path)
+		got[path] = string(b)
+
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return got
+}
+
+// TestConfigSetRefusesAnUnknownKey holds config set to refusing a key its
+// file does not have: viper took any key, the file was saved without it and
+// the command exited 0, so a misspelt key was lost without a word. It checks
+// the node's file and every protocol's: a key that does not exist, one under
+// a table that does not exist, and one misspelt. The keys the installer and
+// the Docker runner set are the control: each is accepted.
+//
+// Rules: [RT-13].
+func TestConfigSetRefusesAnUnknownKey(t *testing.T) {
+	keys := scriptKeys(t)
+	configs := []string{""}
+	for _, p := range services.All() {
+		configs = append(configs, p.Name)
+	}
+	for _, name := range configs {
+		file := name
+		if file == "" {
+			file = "node"
+		}
+		t.Run(file, func(t *testing.T) {
+			t.Parallel()
+			home := t.TempDir()
+			dvpnd := func(args ...string) (int, string) {
+				if name != "" {
+					args = append([]string{name}, args...)
+				}
+
+				return runDvpnd(t, append(args, "--home", home)...)
+			}
+			if status, out := dvpnd("config", "init"); status != 0 {
+				t.Fatalf("config init exited %d:\n%s", status, out)
+			}
+			known := keys[name]
+			if len(known) == 0 {
+				t.Fatalf("neither the installer nor the runner sets a key in this file, so no key is known to be accepted")
+			}
+
+			before := files(t, home)
+			for _, key := range []string{"no_such_key", "no_such_table.key", known[0].key + "x"} {
+				status, out := dvpnd("config", "set", key, "1")
+				if status == 0 || !strings.Contains(out, "Error:") || !strings.Contains(out, key) {
+					t.Errorf("config set %s 1 exited %d; want an error naming the key:\n%s", key, status, out)
+				}
+			}
+			if !maps.Equal(files(t, home), before) {
+				t.Error("a refused config set changed the files")
+			}
+
+			for _, k := range known {
+				if status, out := dvpnd("config", "set", k.key, "1"); status != 0 {
+					t.Errorf("config set %s 1, as %s does, exited %d:\n%s", k.key, k.at, status, out)
+				}
+			}
+			if name == "" {
+				dvpnd("config", "set", "node.moniker", "set-by-test")
+				if _, out := dvpnd("config", "show"); !strings.Contains(out, "set-by-test") {
+					t.Errorf("config set node.moniker did not store the value; config show:\n%s", out)
+				}
+			}
+		})
 	}
 }
