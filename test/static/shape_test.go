@@ -96,8 +96,6 @@ func unstoppedReturns(fset *token.FileSet, stmts []ast.Stmt, stopped bool, defer
 //
 // Rules: [RT-2].
 func TestStartStopsTheServiceOnEveryExit(t *testing.T) {
-	t.Skip("known bug B2: steps after service.Start() return without stopping it; fix awaiting approval")
-
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, filepath.Join(root(t), "cmd", "start.go"), nil, 0)
 	if err != nil {

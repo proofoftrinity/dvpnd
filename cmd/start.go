@@ -171,7 +171,7 @@ func StartCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "start",
 		Short: "Start the VPN node",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) (err error) {
 			var (
 				home         = viper.GetString(flags.FlagHome)
 				configPath   = filepath.Join(home, types.ConfigFileName)
@@ -386,6 +386,19 @@ func StartCmd() *cobra.Command {
 			if err = service.Start(); err != nil {
 				return err
 			}
+			// From here on, however the command ends (a stop signal, a job
+			// that failed, or a step below that fails), the VPN service
+			// stops first, so the tunnel interface, the firewall rules or the
+			// proxy child process do not outlive the node.
+			defer func() {
+				log.Info("Stopping the VPN service", "type", service.Type())
+				if stopErr := service.Stop(); stopErr != nil {
+					log.Error("failed to stop the VPN service", "error", stopErr)
+					if err == nil {
+						err = stopErr
+					}
+				}
+			}()
 
 			if egress.Resolver != nil {
 				go runHandshake(log, config.Handshake.Peers, egress.Resolver)
@@ -429,8 +442,7 @@ func StartCmd() *cobra.Command {
 			}
 
 			// Run until the API server fails, a job panics or a stop signal
-			// arrives, then stop the VPN service so the tunnel interface, the
-			// firewall rules or the proxy child process do not outlive the node.
+			// arrives; the deferred stop above then takes the service down.
 			errCh := make(chan error, 1)
 			go func() { errCh <- n.Start(home) }()
 
@@ -443,14 +455,6 @@ func StartCmd() *cobra.Command {
 				log.Info("Stopping: signal received", "signal", sig.String())
 			case err = <-errCh:
 				log.Error("The node stopped on an error", "error", err)
-			}
-
-			log.Info("Stopping the VPN service", "type", service.Type())
-			if stopErr := service.Stop(); stopErr != nil {
-				log.Error("failed to stop the VPN service", "error", stopErr)
-				if err == nil {
-					err = stopErr
-				}
 			}
 
 			return err

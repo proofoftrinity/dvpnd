@@ -19,6 +19,6 @@
   },
   "citesOnly": ["invariants/canaries.json"],
   "status": "invariants/status.json",
-  "minimums": { "testFiles": 70, "rules": 87, "pinned": 85 },
+  "minimums": { "testFiles": 70, "rules": 87, "pinned": 86 },
   "verify": "make verify"
 }

@@ -526,6 +526,26 @@
         "go test -count=1 -run '^(TestReportedUsage|TestSetSessionsStoresDownloadOnlyUsage)$' ./node/"
       ],
       "expect": "--- FAIL"
+    },
+    {
+      "name": "[RT-2] the start command leaves the service running when it ends",
+      "file": "cmd/start.go",
+      "find": [
+        "\t\t\tdefer func() {",
+        "\t\t\t\tlog.Info(\"Stopping the VPN service\", \"type\", service.Type())",
+        "\t\t\t\tif stopErr := service.Stop(); stopErr != nil {",
+        "\t\t\t\t\tlog.Error(\"failed to stop the VPN service\", \"error\", stopErr)",
+        "\t\t\t\t\tif err == nil {",
+        "\t\t\t\t\t\terr = stopErr",
+        "\t\t\t\t\t}",
+        "\t\t\t\t}",
+        "\t\t\t}()"
+      ],
+      "replace": "",
+      "run": [
+        "go test -count=1 -run '^TestStartStopsTheServiceOnEveryExit$' ./test/static/"
+      ],
+      "expect": "--- FAIL"
     }
   ]
 }

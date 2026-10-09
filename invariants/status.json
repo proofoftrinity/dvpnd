@@ -1,6 +1,5 @@
 {
   "pending": {
-    "RT-2": "known bug B2: test/static's TestStartStopsTheServiceOnEveryExit finds returns after service.Start() that do not stop the service; it is skipped until the fix is approved",
     "LIC-7": "checked by go-licenses in the CI licence gate only; P4 decides whether it becomes manual"
   },
   "partial": {
