@@ -40,11 +40,10 @@ var formerAccountNames = []string{"trinitystake"}
 // keyed by file and line (spaces collapsed), each with its reason: they record
 // the past and point nobody anywhere.
 var formerNameAllowed = map[string]string{
-	"NOTICE: Portions Copyright 2026 trinitystake -- modifications made in this fork":                                                                "the copyright line names the holder as the notice was written",
 	"docs/provenance/fork-verification.txt: PASS fork-point tag signature verifies (trinitystake <114076168+trinitystake@users.noreply.github.com>)": "a dated record of a provenance run; the fork-point tag was signed under that name",
-	"README.md: `github.com/trinitystake/dvpnd/v9`, so the command above works from the next release on.":                                            "the module path the releases before the rename declare",
+	"README.md: `github.com/trinitystake/dvpnd/v9`, so the command above works from 9.4.1 on.":                                                       "the module path the releases before the rename declare",
 	`invariants/canaries.json: "replace": "REPO_URL=\"https://github.com/trinitystake/dvpnd.git\"",`:                                                 "the canary puts the old name back to prove this test catches it",
-	"docs/operator.md: is out, write `trinitystake` for `proofoftrinity` in the identity and the `--repo` value.":                                    "the identity that signed the images built before the rename",
+	"docs/operator.md: signatures name the old account: to check one of them, write `trinitystake` for":                                              "the identity that signed the images built before the rename",
 }
 
 // Rules: [LIC-1].

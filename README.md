@@ -87,7 +87,7 @@ go get github.com/proofoftrinity/dvpnd/v9@latest
 ```
 
 Releases up to 9.4.0 were tagged before the account was renamed and declare the old path,
-`github.com/trinitystake/dvpnd/v9`, so the command above works from the next release on.
+`github.com/trinitystake/dvpnd/v9`, so the command above works from 9.4.1 on.
 
 Configuration lives in `~/.dvpnd/config.toml` (`dvpnd config init`). Existing installs of
 the upstream node keep their data in `~/.sentinelnode`; `dvpnd` does not move it — it logs

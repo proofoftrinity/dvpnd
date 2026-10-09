@@ -435,9 +435,8 @@ gh attestation verify oci://ghcr.io/proofoftrinity/dvpnd:latest --repo proofoftr
 
 Both must succeed; a failure means the image was not built by this repository's release
 workflow. Images up to 9.4.0 were signed before the account was renamed, and their
-signatures name the old account: to check one of them, and `latest` until a newer release
-is out, write `trinitystake` for `proofoftrinity` in the identity and the `--repo` value.
-The image name stays as it is.
+signatures name the old account: to check one of them, write `trinitystake` for
+`proofoftrinity` in the identity and the `--repo` value. The image name stays as it is.
 
 Or build it yourself (the Dockerfile uses BuildKit cache mounts, so BuildKit must be on — it
 is by default on current Docker; otherwise prefix the command with `DOCKER_BUILDKIT=1`):
