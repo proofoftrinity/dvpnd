@@ -10,8 +10,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/trinitystake/dvpnd/v9/context"
-	"github.com/trinitystake/dvpnd/v9/types"
+	"github.com/proofoftrinity/dvpnd/v9/context"
+	"github.com/proofoftrinity/dvpnd/v9/types"
 )
 
 // recoverPanics answers a request whose handler panicked with a 500 and logs

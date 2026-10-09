@@ -18,9 +18,9 @@ import (
 
 	"github.com/spf13/viper"
 
-	"github.com/trinitystake/dvpnd/v9/services/common"
-	wgtypes "github.com/trinitystake/dvpnd/v9/services/wireguard/types"
-	"github.com/trinitystake/dvpnd/v9/types"
+	"github.com/proofoftrinity/dvpnd/v9/services/common"
+	wgtypes "github.com/proofoftrinity/dvpnd/v9/services/wireguard/types"
+	"github.com/proofoftrinity/dvpnd/v9/types"
 )
 
 const (

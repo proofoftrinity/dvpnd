@@ -15,8 +15,8 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/gin-gonic/gin"
 
-	"github.com/trinitystake/dvpnd/v9/context"
-	"github.com/trinitystake/dvpnd/v9/types"
+	"github.com/proofoftrinity/dvpnd/v9/context"
+	"github.com/proofoftrinity/dvpnd/v9/types"
 )
 
 // HandshakeBody is what current client apps POST to a node's root path. The

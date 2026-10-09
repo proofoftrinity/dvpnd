@@ -41,9 +41,9 @@ import (
 	nodetypes "github.com/sentinel-official/sentinelhub/v12/x/node/types/v3"
 	"github.com/spf13/viper"
 
-	"github.com/trinitystake/dvpnd/v9/lite"
-	wgtypes "github.com/trinitystake/dvpnd/v9/services/wireguard/types"
-	"github.com/trinitystake/dvpnd/v9/types"
+	"github.com/proofoftrinity/dvpnd/v9/lite"
+	wgtypes "github.com/proofoftrinity/dvpnd/v9/services/wireguard/types"
+	"github.com/proofoftrinity/dvpnd/v9/types"
 )
 
 func main() {

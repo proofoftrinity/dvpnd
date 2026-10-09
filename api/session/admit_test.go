@@ -22,9 +22,9 @@ import (
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
 
-	"github.com/trinitystake/dvpnd/v9/context"
-	"github.com/trinitystake/dvpnd/v9/lite"
-	"github.com/trinitystake/dvpnd/v9/types"
+	"github.com/proofoftrinity/dvpnd/v9/context"
+	"github.com/proofoftrinity/dvpnd/v9/lite"
+	"github.com/proofoftrinity/dvpnd/v9/types"
 )
 
 // fakeService keeps peers in a map and takes a moment to add one, as a real

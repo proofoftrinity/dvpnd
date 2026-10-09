@@ -12,7 +12,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	"github.com/spf13/viper"
 
-	"github.com/trinitystake/dvpnd/v9/types"
+	"github.com/proofoftrinity/dvpnd/v9/types"
 )
 
 // TestKeysAddShowsOnlyANewMnemonic: a new key's mnemonic is printed once, as

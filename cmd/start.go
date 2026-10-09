@@ -28,16 +28,16 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/trinitystake/dvpnd/v9/api"
-	"github.com/trinitystake/dvpnd/v9/context"
-	"github.com/trinitystake/dvpnd/v9/libs/bandwidth"
-	"github.com/trinitystake/dvpnd/v9/libs/geoip"
-	"github.com/trinitystake/dvpnd/v9/lite"
-	"github.com/trinitystake/dvpnd/v9/node"
-	"github.com/trinitystake/dvpnd/v9/services"
-	"github.com/trinitystake/dvpnd/v9/services/common"
-	"github.com/trinitystake/dvpnd/v9/types"
-	"github.com/trinitystake/dvpnd/v9/utils"
+	"github.com/proofoftrinity/dvpnd/v9/api"
+	"github.com/proofoftrinity/dvpnd/v9/context"
+	"github.com/proofoftrinity/dvpnd/v9/libs/bandwidth"
+	"github.com/proofoftrinity/dvpnd/v9/libs/geoip"
+	"github.com/proofoftrinity/dvpnd/v9/lite"
+	"github.com/proofoftrinity/dvpnd/v9/node"
+	"github.com/proofoftrinity/dvpnd/v9/services"
+	"github.com/proofoftrinity/dvpnd/v9/services/common"
+	"github.com/proofoftrinity/dvpnd/v9/types"
+	"github.com/proofoftrinity/dvpnd/v9/utils"
 )
 
 func init() {

@@ -21,8 +21,8 @@ import (
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
 
-	"github.com/trinitystake/dvpnd/v9/context"
-	"github.com/trinitystake/dvpnd/v9/types"
+	"github.com/proofoftrinity/dvpnd/v9/context"
+	"github.com/proofoftrinity/dvpnd/v9/types"
 )
 
 // fakeChain holds sessions by id and refuses a report that names a session

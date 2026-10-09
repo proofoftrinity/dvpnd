@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/trinitystake/dvpnd/v9/services"
+	"github.com/proofoftrinity/dvpnd/v9/services"
 )
 
 // callsOn reports whether n calls recv.method (service.Stop), outside any

@@ -30,9 +30,9 @@ import (
 
 	"github.com/spf13/viper"
 
-	"github.com/trinitystake/dvpnd/v9/services/common"
-	hysteriatypes "github.com/trinitystake/dvpnd/v9/services/hysteria/types"
-	"github.com/trinitystake/dvpnd/v9/types"
+	"github.com/proofoftrinity/dvpnd/v9/services/common"
+	hysteriatypes "github.com/proofoftrinity/dvpnd/v9/services/hysteria/types"
+	"github.com/proofoftrinity/dvpnd/v9/types"
 )
 
 const (

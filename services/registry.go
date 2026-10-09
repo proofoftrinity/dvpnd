@@ -12,19 +12,19 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/trinitystake/dvpnd/v9/services/amneziawg"
-	awgtypes "github.com/trinitystake/dvpnd/v9/services/amneziawg/types"
-	"github.com/trinitystake/dvpnd/v9/services/hysteria"
-	hysteriatypes "github.com/trinitystake/dvpnd/v9/services/hysteria/types"
-	"github.com/trinitystake/dvpnd/v9/services/openvpn"
-	ovpntypes "github.com/trinitystake/dvpnd/v9/services/openvpn/types"
-	"github.com/trinitystake/dvpnd/v9/services/v2ray"
-	v2raytypes "github.com/trinitystake/dvpnd/v9/services/v2ray/types"
-	"github.com/trinitystake/dvpnd/v9/services/wireguard"
-	wgtypes "github.com/trinitystake/dvpnd/v9/services/wireguard/types"
-	"github.com/trinitystake/dvpnd/v9/services/xray"
-	xraytypes "github.com/trinitystake/dvpnd/v9/services/xray/types"
-	"github.com/trinitystake/dvpnd/v9/types"
+	"github.com/proofoftrinity/dvpnd/v9/services/amneziawg"
+	awgtypes "github.com/proofoftrinity/dvpnd/v9/services/amneziawg/types"
+	"github.com/proofoftrinity/dvpnd/v9/services/hysteria"
+	hysteriatypes "github.com/proofoftrinity/dvpnd/v9/services/hysteria/types"
+	"github.com/proofoftrinity/dvpnd/v9/services/openvpn"
+	ovpntypes "github.com/proofoftrinity/dvpnd/v9/services/openvpn/types"
+	"github.com/proofoftrinity/dvpnd/v9/services/v2ray"
+	v2raytypes "github.com/proofoftrinity/dvpnd/v9/services/v2ray/types"
+	"github.com/proofoftrinity/dvpnd/v9/services/wireguard"
+	wgtypes "github.com/proofoftrinity/dvpnd/v9/services/wireguard/types"
+	"github.com/proofoftrinity/dvpnd/v9/services/xray"
+	xraytypes "github.com/proofoftrinity/dvpnd/v9/services/xray/types"
+	"github.com/proofoftrinity/dvpnd/v9/types"
 )
 
 // Protocol is one registered VPN protocol.

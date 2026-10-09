@@ -11,7 +11,7 @@ import (
 
 	"github.com/spf13/viper"
 
-	"github.com/trinitystake/dvpnd/v9/libs/geoip"
+	"github.com/proofoftrinity/dvpnd/v9/libs/geoip"
 )
 
 func TestBandwidthConfigValidate(t *testing.T) {

@@ -23,9 +23,9 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"github.com/trinitystake/dvpnd/v9/services/common"
-	xraytypes "github.com/trinitystake/dvpnd/v9/services/xray/types"
-	"github.com/trinitystake/dvpnd/v9/types"
+	"github.com/proofoftrinity/dvpnd/v9/services/common"
+	xraytypes "github.com/proofoftrinity/dvpnd/v9/services/xray/types"
+	"github.com/proofoftrinity/dvpnd/v9/types"
 )
 
 const (

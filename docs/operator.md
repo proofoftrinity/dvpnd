@@ -39,7 +39,7 @@ creates or recovers the operator key, makes the TLS certificate, opens ufw and i
 systemd unit. Read it first; then:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/trinitystake/dvpnd/main/scripts/install.sh -o install.sh
+curl -fsSL https://raw.githubusercontent.com/proofoftrinity/dvpnd/main/scripts/install.sh -o install.sh
 sudo bash install.sh --moniker "My node"          # --type amneziawg|openvpn|v2ray|xray|hysteria2, --help for the rest
 ```
 
@@ -412,12 +412,12 @@ report lower than the last one, and one refused report fails the whole batch).
 
 Use this when you want the bundled `v2ray`, `xray`, `hysteria`, `openvpn`, AmneziaWG tools
 and `hnsd`, cannot install Go on the host, or the host already runs everything in Docker.
-Every GitHub release publishes the image as `ghcr.io/trinitystake/dvpnd:<version>` and
+Every GitHub release publishes the image as `ghcr.io/proofoftrinity/dvpnd:<version>` and
 `:latest`, built by the repository's own workflow from that tag. Pull it and give it the
 local name the commands below use:
 
 ```sh
-docker pull ghcr.io/trinitystake/dvpnd:latest && docker tag ghcr.io/trinitystake/dvpnd:latest dvpnd
+docker pull ghcr.io/proofoftrinity/dvpnd:latest && docker tag ghcr.io/proofoftrinity/dvpnd:latest dvpnd
 ```
 
 Images from 9.4.0 on are signed by that workflow, with no signing key anyone
@@ -427,14 +427,17 @@ later (cosign 2 cannot read the signature format and answers "no signatures foun
 GitHub CLI:
 
 ```sh
-cosign verify ghcr.io/trinitystake/dvpnd:latest \
-  --certificate-identity-regexp '^https://github.com/trinitystake/dvpnd/\.github/workflows/docker-publish\.yml@refs/tags/v' \
+cosign verify ghcr.io/proofoftrinity/dvpnd:latest \
+  --certificate-identity-regexp '^https://github.com/proofoftrinity/dvpnd/\.github/workflows/docker-publish\.yml@refs/tags/v' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
-gh attestation verify oci://ghcr.io/trinitystake/dvpnd:latest --repo trinitystake/dvpnd
+gh attestation verify oci://ghcr.io/proofoftrinity/dvpnd:latest --repo proofoftrinity/dvpnd
 ```
 
 Both must succeed; a failure means the image was not built by this repository's release
-workflow.
+workflow. Images up to 9.4.0 were signed before the account was renamed, and their
+signatures name the old account: to check one of them, and `latest` until a newer release
+is out, write `trinitystake` for `proofoftrinity` in the identity and the `--repo` value.
+The image name stays as it is.
 
 Or build it yourself (the Dockerfile uses BuildKit cache mounts, so BuildKit must be on — it
 is by default on current Docker; otherwise prefix the command with `DOCKER_BUILDKIT=1`):
@@ -558,7 +561,7 @@ pins hysteria app/v2.10.0 and checks its sha256 at build time.
 The `--log-opt` flags cap the container's log at three files of 50 MB; Docker's default
 json-file log grows without bound. `scripts/runner.sh` wraps these commands (`init`, `start`,
 `stop`, `status`, `update`) for every node type; its `NODE_IMAGE` is the published
-`ghcr.io/trinitystake/dvpnd:latest`, so edit it only to pin a version or to use your own build.
+`ghcr.io/proofoftrinity/dvpnd:latest`, so edit it only to pin a version or to use your own build.
 
 The WireGuard path is exercised by an end-to-end test that builds the image, registers a
 node, buys a session and connects a client from a second container — a WireGuard node served

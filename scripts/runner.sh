@@ -4,7 +4,7 @@ set -Eeou pipefail
 
 CONTAINER_NAME=dvpnd
 NODE_DIR="${HOME}/.dvpnd"
-NODE_IMAGE=ghcr.io/trinitystake/dvpnd:latest
+NODE_IMAGE=ghcr.io/proofoftrinity/dvpnd:latest
 
 function stop {
   id=$(docker ps --filter name="${CONTAINER_NAME}" --quiet)

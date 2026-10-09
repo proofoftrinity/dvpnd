@@ -6,7 +6,7 @@ package session
 import (
 	"github.com/gin-gonic/gin"
 
-	"github.com/trinitystake/dvpnd/v9/context"
+	"github.com/proofoftrinity/dvpnd/v9/context"
 )
 
 func RegisterRoutes(ctx *context.Context, router gin.IRouter) {

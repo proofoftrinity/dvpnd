@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	wgtypes "github.com/trinitystake/dvpnd/v9/services/wireguard/types"
+	wgtypes "github.com/proofoftrinity/dvpnd/v9/services/wireguard/types"
 )
 
 // Rules: [CT-5].

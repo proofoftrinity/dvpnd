@@ -16,14 +16,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/trinitystake/dvpnd/v9/services/common"
-	"github.com/trinitystake/dvpnd/v9/services/hysteria"
-	hysteriatypes "github.com/trinitystake/dvpnd/v9/services/hysteria/types"
-	"github.com/trinitystake/dvpnd/v9/services/v2ray"
-	v2raytypes "github.com/trinitystake/dvpnd/v9/services/v2ray/types"
-	"github.com/trinitystake/dvpnd/v9/services/xray"
-	xraytypes "github.com/trinitystake/dvpnd/v9/services/xray/types"
-	"github.com/trinitystake/dvpnd/v9/types"
+	"github.com/proofoftrinity/dvpnd/v9/services/common"
+	"github.com/proofoftrinity/dvpnd/v9/services/hysteria"
+	hysteriatypes "github.com/proofoftrinity/dvpnd/v9/services/hysteria/types"
+	"github.com/proofoftrinity/dvpnd/v9/services/v2ray"
+	v2raytypes "github.com/proofoftrinity/dvpnd/v9/services/v2ray/types"
+	"github.com/proofoftrinity/dvpnd/v9/services/xray"
+	xraytypes "github.com/proofoftrinity/dvpnd/v9/services/xray/types"
+	"github.com/proofoftrinity/dvpnd/v9/types"
 )
 
 // proxyCase is one proxy protocol: how the node's configuration is written,

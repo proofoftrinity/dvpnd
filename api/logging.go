@@ -9,9 +9,9 @@ import (
 	"github.com/cosmos/cosmos-sdk/version"
 	"github.com/gin-gonic/gin"
 
-	"github.com/trinitystake/dvpnd/v9/api/session"
-	"github.com/trinitystake/dvpnd/v9/context"
-	"github.com/trinitystake/dvpnd/v9/types"
+	"github.com/proofoftrinity/dvpnd/v9/api/session"
+	"github.com/proofoftrinity/dvpnd/v9/context"
+	"github.com/proofoftrinity/dvpnd/v9/types"
 )
 
 // serverHeader names the node software on every response, the way any HTTP

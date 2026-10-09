@@ -10,7 +10,7 @@ import (
 	nodetypes "github.com/sentinel-official/sentinelhub/v12/x/node/types/v3"
 	sessiontypes "github.com/sentinel-official/sentinelhub/v12/x/session/types/v3"
 
-	"github.com/trinitystake/dvpnd/v9/types"
+	"github.com/proofoftrinity/dvpnd/v9/types"
 )
 
 func (c *Context) RegisterNode() error {

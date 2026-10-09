@@ -1,7 +1,7 @@
 # dvpnd
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Go](https://img.shields.io/github/go-mod/go-version/trinitystake/dvpnd)](go.mod)
+[![Go](https://img.shields.io/github/go-mod/go-version/proofoftrinity/dvpnd)](go.mod)
 
 `dvpnd` is an open source dVPN node daemon for the Sentinel blockchain (chain ID
 `sentinelhub-2`). It registers the node on-chain, serves WireGuard or V2Ray sessions to
@@ -79,12 +79,15 @@ make build            # ./bin/dvpnd  (needs Go ≥ 1.26, gcc for sqlite)
 `go install pkg@version` for any module whose `go.mod` replaces something. Build from
 source, which is also what stamps the version and commit the node reports.
 
-The module path is `github.com/trinitystake/dvpnd/v9`, carrying the major version as Go
+The module path is `github.com/proofoftrinity/dvpnd/v9`, carrying the major version as Go
 requires from v2 upwards, so packages here can be imported by other modules:
 
 ```sh
-go get github.com/trinitystake/dvpnd/v9@latest
+go get github.com/proofoftrinity/dvpnd/v9@latest
 ```
+
+Releases up to 9.4.0 were tagged before the account was renamed and declare the old path,
+`github.com/trinitystake/dvpnd/v9`, so the command above works from the next release on.
 
 Configuration lives in `~/.dvpnd/config.toml` (`dvpnd config init`). Existing installs of
 the upstream node keep their data in `~/.sentinelnode`; `dvpnd` does not move it — it logs

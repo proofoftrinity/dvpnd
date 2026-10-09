@@ -13,7 +13,7 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/trinitystake/dvpnd/v9/services/common"
+	"github.com/proofoftrinity/dvpnd/v9/services/common"
 )
 
 // TestProxyAccountChain checks the kernel's hold on the proxy account on its

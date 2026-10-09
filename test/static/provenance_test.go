@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -26,8 +27,25 @@ const (
 	// The module path at the fork point and now; renaming it alone is not a
 	// change to a file.
 	upstreamModule = "github.com/sentinel-official/dvpn-node"
-	forkModule     = "github.com/trinitystake/dvpnd/v9"
+	forkModule     = "github.com/" + accountName + "/dvpnd/v9"
+	// accountName is the GitHub account that owns the repository.
+	accountName = "proofoftrinity"
 )
+
+// formerAccountNames are the names the account had before; anyone can register
+// one once it is given up.
+var formerAccountNames = []string{"trinitystake"}
+
+// formerNameAllowed lists the lines that may still name a former account,
+// keyed by file and line (spaces collapsed), each with its reason: they record
+// the past and point nobody anywhere.
+var formerNameAllowed = map[string]string{
+	"NOTICE: Portions Copyright 2026 trinitystake -- modifications made in this fork":                                                                "the copyright line names the holder as the notice was written",
+	"docs/provenance/fork-verification.txt: PASS fork-point tag signature verifies (trinitystake <114076168+trinitystake@users.noreply.github.com>)": "a dated record of a provenance run; the fork-point tag was signed under that name",
+	"README.md: `github.com/trinitystake/dvpnd/v9`, so the command above works from the next release on.":                                            "the module path the releases before the rename declare",
+	`invariants/canaries.json: "replace": "REPO_URL=\"https://github.com/trinitystake/dvpnd.git\"",`:                                                 "the canary puts the old name back to prove this test catches it",
+	"docs/operator.md: is out, write `trinitystake` for `proofoftrinity` in the identity and the `--repo` value.":                                    "the identity that signed the images built before the rename",
+}
 
 // Rules: [LIC-1].
 func TestEveryGoFileStartsWithSPDX(t *testing.T) {
@@ -212,6 +230,41 @@ func TestNoOnChainAddresses(t *testing.T) {
 	sort.Strings(hits)
 	for _, h := range hits {
 		t.Errorf("an on-chain address in a committed file (it links the repository to a wallet): %s", h)
+	}
+}
+
+// Rules: [LIC-8].
+func TestNoFormerAccountName(t *testing.T) {
+	if module, _, _ := strings.Cut(string(read(t, "go.mod")), "\n"); module != "module "+forkModule {
+		t.Errorf("go.mod declares %q; the module path is %s", module, forkModule)
+	}
+
+	_, self, _, _ := runtime.Caller(0)
+	self = "test/static/" + filepath.Base(self) // it names them to look for them
+	seen := map[string]bool{}
+	for _, f := range files(t, ".") {
+		b := read(t, f)
+		if f == self || bytes.IndexByte(b, 0) >= 0 { // binary
+			continue
+		}
+		for i, line := range strings.Split(string(b), "\n") {
+			for _, name := range formerAccountNames {
+				if !strings.Contains(strings.ToLower(line), name) {
+					continue
+				}
+				key := f + ": " + strings.Join(strings.Fields(line), " ")
+				if _, ok := formerNameAllowed[key]; ok {
+					seen[key] = true
+					continue
+				}
+				t.Errorf("%s:%d names the former account %s; use %s, since anyone can register a name once it is given up", f, i+1, name, accountName)
+			}
+		}
+	}
+	for key := range formerNameAllowed {
+		if !seen[key] {
+			t.Errorf("formerNameAllowed lists a line that is no longer in the tree; remove it: %s", key)
+		}
 	}
 }
 

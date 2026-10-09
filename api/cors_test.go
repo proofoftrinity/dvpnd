@@ -11,9 +11,9 @@ import (
 	cmtlog "github.com/cometbft/cometbft/libs/log"
 	"github.com/gin-gonic/gin"
 
-	"github.com/trinitystake/dvpnd/v9/api/session"
-	"github.com/trinitystake/dvpnd/v9/context"
-	"github.com/trinitystake/dvpnd/v9/types"
+	"github.com/proofoftrinity/dvpnd/v9/api/session"
+	"github.com/proofoftrinity/dvpnd/v9/context"
+	"github.com/proofoftrinity/dvpnd/v9/types"
 )
 
 // TestBrowsersCanReadTheSignature: a client app running in a browser can

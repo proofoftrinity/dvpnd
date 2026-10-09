@@ -16,9 +16,9 @@ import (
 	v1base "github.com/sentinel-official/sentinelhub/v12/types/v1"
 	"gorm.io/gorm"
 
-	geoiptypes "github.com/trinitystake/dvpnd/v9/libs/geoip/types"
-	"github.com/trinitystake/dvpnd/v9/lite"
-	"github.com/trinitystake/dvpnd/v9/types"
+	geoiptypes "github.com/proofoftrinity/dvpnd/v9/libs/geoip/types"
+	"github.com/proofoftrinity/dvpnd/v9/lite"
+	"github.com/proofoftrinity/dvpnd/v9/types"
 )
 
 type Context struct {

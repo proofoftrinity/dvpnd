@@ -5,7 +5,7 @@ package node
 import (
 	"testing"
 
-	"github.com/trinitystake/dvpnd/v9/types"
+	"github.com/proofoftrinity/dvpnd/v9/types"
 )
 
 // A client that reconnects after a node restart keeps its on-chain session;

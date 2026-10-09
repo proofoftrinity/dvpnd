@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/trinitystake/dvpnd/v9/services/common"
-	ovpntypes "github.com/trinitystake/dvpnd/v9/services/openvpn/types"
+	"github.com/proofoftrinity/dvpnd/v9/services/common"
+	ovpntypes "github.com/proofoftrinity/dvpnd/v9/services/openvpn/types"
 )
 
 func stubBinary(t *testing.T) {

@@ -11,7 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 
-	"github.com/trinitystake/dvpnd/v9/utils"
+	"github.com/proofoftrinity/dvpnd/v9/utils"
 )
 
 var (

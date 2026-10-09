@@ -18,14 +18,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/trinitystake/dvpnd/v9/services/amneziawg"
-	awgtypes "github.com/trinitystake/dvpnd/v9/services/amneziawg/types"
-	"github.com/trinitystake/dvpnd/v9/services/common"
-	"github.com/trinitystake/dvpnd/v9/services/openvpn"
-	ovpntypes "github.com/trinitystake/dvpnd/v9/services/openvpn/types"
-	"github.com/trinitystake/dvpnd/v9/services/wireguard"
-	wgtypes "github.com/trinitystake/dvpnd/v9/services/wireguard/types"
-	"github.com/trinitystake/dvpnd/v9/types"
+	"github.com/proofoftrinity/dvpnd/v9/services/amneziawg"
+	awgtypes "github.com/proofoftrinity/dvpnd/v9/services/amneziawg/types"
+	"github.com/proofoftrinity/dvpnd/v9/services/common"
+	"github.com/proofoftrinity/dvpnd/v9/services/openvpn"
+	ovpntypes "github.com/proofoftrinity/dvpnd/v9/services/openvpn/types"
+	"github.com/proofoftrinity/dvpnd/v9/services/wireguard"
+	wgtypes "github.com/proofoftrinity/dvpnd/v9/services/wireguard/types"
+	"github.com/proofoftrinity/dvpnd/v9/types"
 )
 
 // The client's network namespace and the veth pair that joins it to the

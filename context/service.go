@@ -6,7 +6,7 @@ package context
 import (
 	"encoding/base64"
 
-	"github.com/trinitystake/dvpnd/v9/types"
+	"github.com/proofoftrinity/dvpnd/v9/types"
 )
 
 func (c *Context) RemovePeer(key string) error {

@@ -13,7 +13,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
-	"github.com/trinitystake/dvpnd/v9/lite"
+	"github.com/proofoftrinity/dvpnd/v9/lite"
 )
 
 func nodeSigner(t *testing.T) *lite.Client {

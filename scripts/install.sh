@@ -13,7 +13,7 @@
 #
 # Run it as root:
 #
-#   curl -fsSL https://raw.githubusercontent.com/trinitystake/dvpnd/main/scripts/install.sh \
+#   curl -fsSL https://raw.githubusercontent.com/proofoftrinity/dvpnd/main/scripts/install.sh \
 #     -o install.sh && sudo bash install.sh --moniker "My node"
 #
 # Every step is skipped when its result already exists, so the script can be
@@ -22,13 +22,13 @@
 
 set -Eeuo pipefail
 
-REPO_URL="https://github.com/trinitystake/dvpnd.git"
-REPO_API="https://api.github.com/repos/trinitystake/dvpnd/releases/latest"
+REPO_URL="https://github.com/proofoftrinity/dvpnd.git"
+REPO_API="https://api.github.com/repos/proofoftrinity/dvpnd/releases/latest"
 
 # Release tags are signed with the maintainer's SSH key; the installer builds
 # a tag only when its signature checks out against this key. It is the same
 # key GitHub shows as verified on the tags.
-TAG_SIGNER="114076168+trinitystake@users.noreply.github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFqdfC3zNhLfD0Hl5H2bvlCvtBtOBhz0VSiietVWvMch"
+TAG_SIGNER="114076168+proofoftrinity@users.noreply.github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFqdfC3zNhLfD0Hl5H2bvlCvtBtOBhz0VSiietVWvMch"
 
 # Pinned protocol binaries: the versions the client apps are tested against and
 # the ones the Docker image builds (see Dockerfile).

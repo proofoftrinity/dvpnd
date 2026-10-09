@@ -21,3 +21,8 @@ unlicensed code (`NOTICE`, `CONTRIBUTING.md`). IDs as in `test/README.md`.
   Test fixtures use synthetic keys; an address that must appear is listed with its reason.
 - **[LIC-7] Every dependency carries a permissive or weak-copyleft licence.** The CI
   licence gate refuses forbidden, restricted and unknown licences.
+- **[LIC-8] Every link, module path and image name uses the account's current name.**
+  The account that owns the repository was renamed. GitHub redirects a former name only
+  until someone else registers it; from then on a link to it serves a stranger's code, and
+  the install command runs that code as root. A former name stays only on lines that record
+  the past, each listed in the test with its reason.

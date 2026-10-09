@@ -18,9 +18,9 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/trinitystake/dvpnd/v9/lite"
-	"github.com/trinitystake/dvpnd/v9/types"
-	"github.com/trinitystake/dvpnd/v9/utils"
+	"github.com/proofoftrinity/dvpnd/v9/lite"
+	"github.com/proofoftrinity/dvpnd/v9/types"
+	"github.com/proofoftrinity/dvpnd/v9/utils"
 )
 
 // warnLegacyHome prints the migration hint from types.LegacyHomeHint, if any,

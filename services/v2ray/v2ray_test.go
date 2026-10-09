@@ -14,8 +14,8 @@ import (
 
 	"github.com/spf13/viper"
 
-	"github.com/trinitystake/dvpnd/v9/services/common"
-	v2raytypes "github.com/trinitystake/dvpnd/v9/services/v2ray/types"
+	"github.com/proofoftrinity/dvpnd/v9/services/common"
+	v2raytypes "github.com/proofoftrinity/dvpnd/v9/services/v2ray/types"
 )
 
 // stub writes an executable script named v2ray into a temp dir and points
