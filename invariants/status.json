@@ -1,21 +1,11 @@
 {
   "pending": {
     "SL-3": "known bug B1: node/sessions_test.go's TestSetSessionsStoresDownloadOnlyUsage shows download-only usage is not stored and the allocation not checked; it is skipped until the fix is approved",
-    "SL-13": "the 80% cap is computed inline in cmd/start.go; P2 moves it into a function and tests it",
-    "HS-13": "nothing checks the environment V2Ray starts with; P2 adds a test that it lacks V2RAY_VMESS_AEAD_FORCED=false",
-    "CH-8": "the remote loops in lite/ have no test; P2 adds one with two fake remotes, the first failing",
-    "CT-6": "no test reads Info(); P2 checks the port bytes for every protocol in the registry",
-    "RT-2": "known bug B2: test/static's TestStartStopsTheServiceOnEveryExit finds four returns after service.Start() that do not stop it; it is skipped until the fix is approved",
+    "RT-2": "known bug B2: test/static's TestStartStopsTheServiceOnEveryExit finds returns after service.Start() that do not stop the service; it is skipped until the fix is approved",
     "LIC-7": "checked by go-licenses in the CI licence gate only; P4 decides whether it becomes manual"
   },
   "partial": {
     "SL-12": "a panicking job and each pass's error handling are tested; the job loops that log and retry are not",
-    "HS-3": "the limiter and the client block are tested; that a spoofed X-Forwarded-For does not escape the limit is not (P2)",
-    "HS-7": "the header on every response is tested; its CORS exposure is set in cmd/start.go and is not (P2)",
-    "PV-2": "Hysteria, OpenVPN and XRAY are tested; V2Ray's logging set to none is not",
-    "PV-4": "the test opens the database with its own copy of the DSN; the DSN cmd/start.go uses is not tested (P2)",
-    "CH-3": "the config validation of the address is tested; the refusal of the signing key's own address is in cmd/start.go and is not (P2)",
-    "CT-9": "where each pool starts is tested; unique addresses, a full pool and a released address are not (P2)",
     "LIC-3": "the four files of known bug B3 are listed in knownUnmarked in test/static/provenance_test.go until the fix is approved; every other file is checked"
   },
   "manual": {}

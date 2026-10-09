@@ -42,7 +42,9 @@ not yet.
   import, the notice on every upstream file changed in substance, `LICENSE` as
   the fork point had it, the provenance script passing offline, no wallet or
   node address in any committed file, every protocol in the integration suite,
-  and the start command stopping the service on every exit;
+  the start command stopping the service on every exit, the session database
+  opened in one place (`node.OpenDatabase`) and the RPC remotes looped over in
+  one place (`lite`'s `eachRemote`), so their tests cover every caller;
 - the same SPDX and `sentinel-go-sdk` checks as shell steps, and
   `docs/provenance/verify-fork.sh`, which also asks apache.org,
   proxy.golang.org and Software Heritage when it can reach them (an

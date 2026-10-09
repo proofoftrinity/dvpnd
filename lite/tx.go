@@ -4,7 +4,6 @@
 package lite
 
 import (
-	stderrors "errors"
 	"fmt"
 	"time"
 
@@ -71,18 +70,15 @@ func (c *Client) BroadcastTx(txBytes []byte) (res *sdk.TxResponse, err error) {
 		}
 	}()
 
-	var errs []error
-	for i := 0; i < len(c.remotes); i++ {
-		res, err = c.broadcastTx(c.remotes[i], txBytes)
-		if err == nil {
-			return res, nil
-		}
-
-		c.log.Info("Broadcast failed", "remote", c.remotes[i], "error", err)
-		errs = append(errs, fmt.Errorf("%s: %w", c.remotes[i], err))
+	err = c.eachRemote("Broadcast failed", func(remote string) (err error) {
+		res, err = c.broadcastTx(remote, txBytes)
+		return err
+	})
+	if err != nil {
+		return nil, err
 	}
 
-	return nil, stderrors.Join(errs...)
+	return res, nil
 }
 
 func (c *Client) calculateGas(remote string, txf tx.Factory, messages ...sdk.Msg) (uint64, error) {
@@ -104,18 +100,15 @@ func (c *Client) calculateGas(remote string, txf tx.Factory, messages ...sdk.Msg
 }
 
 func (c *Client) CalculateGas(txf tx.Factory, messages ...sdk.Msg) (gas uint64, err error) {
-	var errs []error
-	for i := 0; i < len(c.remotes); i++ {
-		gas, err = c.calculateGas(c.remotes[i], txf, messages...)
-		if err == nil {
-			return gas, nil
-		}
-
-		c.log.Info("Gas calculation failed", "remote", c.remotes[i], "error", err)
-		errs = append(errs, fmt.Errorf("%s: %w", c.remotes[i], err))
+	err = c.eachRemote("Gas calculation failed", func(remote string) (err error) {
+		gas, err = c.calculateGas(remote, txf, messages...)
+		return err
+	})
+	if err != nil {
+		return 0, err
 	}
 
-	return 0, stderrors.Join(errs...)
+	return gas, nil
 }
 
 func (c *Client) PrepareTxFactory(messages ...sdk.Msg) (txf tx.Factory, err error) {

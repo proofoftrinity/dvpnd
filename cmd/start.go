@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -24,17 +23,12 @@ import (
 	"github.com/cosmos/cosmos-sdk/client/flags"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	v1base "github.com/sentinel-official/sentinelhub/v12/types/v1"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
 
 	"github.com/trinitystake/dvpnd/v9/api"
-	"github.com/trinitystake/dvpnd/v9/api/session"
 	"github.com/trinitystake/dvpnd/v9/context"
 	"github.com/trinitystake/dvpnd/v9/libs/bandwidth"
 	"github.com/trinitystake/dvpnd/v9/libs/geoip"
@@ -115,6 +109,36 @@ func expectedFees(config *types.Config, d time.Duration) sdk.Coins {
 	}
 
 	return fees
+}
+
+// fitInterval is the interval to use for a job the chain times out after
+// statusTimeout: the configured one, unless it exceeds 80% of the timeout,
+// which leaves a missed tick room before the chain deactivates the node or
+// ends the session. lower says whether it was lowered.
+func fitInterval(configured, statusTimeout time.Duration) (limit time.Duration, lower bool) {
+	if limit = statusTimeout * 4 / 5; limit > 0 && configured > limit {
+		return limit, true
+	}
+
+	return configured, false
+}
+
+// granterOf parses [keyring] granter: nil when it is empty, an error when it
+// is not an address or is the signing key's own. A node that signs with the
+// node account's own key has no hot key, and leaves the field empty.
+func granterOf(value string, signer sdk.AccAddress) (sdk.AccAddress, error) {
+	if value == "" {
+		return nil, nil
+	}
+	granter, err := sdk.AccAddressFromBech32(value)
+	if err != nil {
+		return nil, err
+	}
+	if granter.Equals(signer) {
+		return nil, errors.New("[keyring] granter is the signing key's own address; leave it empty")
+	}
+
+	return granter, nil
 }
 
 // apiPort is the TCP port of the node API's listen address; zero when it
@@ -231,14 +255,11 @@ func StartCmd() *cobra.Command {
 				WithSimulateAndExecute(config.Chain.SimulateAndExecute).
 				WithTxTimeout(config.Chain.RPCTxTimeout)
 
-			if config.Keyring.Granter != "" {
-				granter, err := sdk.AccAddressFromBech32(config.Keyring.Granter)
-				if err != nil {
-					return err
-				}
-				if granter.Equals(client.FromAddress()) {
-					return errors.New("[keyring] granter is the signing key's own address; leave it empty")
-				}
+			granter, err := granterOf(config.Keyring.Granter, client.FromAddress())
+			if err != nil {
+				return err
+			}
+			if granter != nil {
 				client = client.WithGranter(granter)
 				log.Info("Signing with a hot key for the node account", "key", client.FromAddress(), "node_account", granter)
 			}
@@ -266,14 +287,14 @@ func StartCmd() *cobra.Command {
 			// operator configured, never update less often than 80% of that.
 			if params, err := client.QueryNodeParams(); err != nil {
 				return err
-			} else if limit := params.StatusTimeout * 4 / 5; limit > 0 && config.Node.IntervalUpdateStatus > limit {
+			} else if limit, lower := fitInterval(config.Node.IntervalUpdateStatus, params.StatusTimeout); lower {
 				log.Info("Lowering interval_update_status to fit the chain's node status_timeout",
 					"configured", config.Node.IntervalUpdateStatus, "status_timeout", params.StatusTimeout, "effective", limit)
 				config.Node.IntervalUpdateStatus = limit
 			}
 			if params, err := client.QuerySessionParams(); err != nil {
 				return err
-			} else if limit := params.StatusTimeout * 4 / 5; limit > 0 && config.Node.IntervalUpdateSessions > limit {
+			} else if limit, lower := fitInterval(config.Node.IntervalUpdateSessions, params.StatusTimeout); lower {
 				log.Info("Lowering interval_update_sessions to fit the chain's session status_timeout",
 					"configured", config.Node.IntervalUpdateSessions, "status_timeout", params.StatusTimeout, "effective", limit)
 				config.Node.IntervalUpdateSessions = limit
@@ -371,46 +392,14 @@ func StartCmd() *cobra.Command {
 			}
 
 			log.Info("Opening the database", "path", databasePath)
-			database, err := gorm.Open(
-				// secure_delete zeroes deleted rows, so a session's wallet
-				// address and peer key do not linger in free pages of the file.
-				sqlite.Open(databasePath+"?_secure_delete=on"),
-				&gorm.Config{
-					Logger:      logger.Discard,
-					PrepareStmt: false,
-				},
-			)
+			database, err := node.OpenDatabase(databasePath)
 			if err != nil {
 				return err
 			}
 
-			log.Info("Migrating the database models...")
-			if err = database.AutoMigrate(&types.Session{}); err != nil {
-				return err
-			}
-
 			var (
-				ctx            = context.NewContext()
-				router         = gin.New()
-				corsMiddleware = cors.New(
-					cors.Config{
-						AllowAllOrigins: true,
-						AllowMethods: []string{
-							http.MethodGet,
-							http.MethodPost,
-						},
-						AllowHeaders: []string{
-							types.ContentType,
-						},
-						// A client running in a browser must be able to
-						// read the reply's signature, and that the node
-						// signs.
-						ExposeHeaders: []string{
-							session.ReplySignatureHeader,
-							session.ReplySigningHeader,
-						},
-					},
-				)
+				ctx    = context.NewContext()
+				router = gin.New()
 			)
 
 			ctx = ctx.WithBandwidth(&bw).
@@ -425,7 +414,6 @@ func StartCmd() *cobra.Command {
 
 			// The routes read the configuration, so they are registered once
 			// the context carries it.
-			router.Use(corsMiddleware)
 			api.RegisterRoutes(ctx, router)
 			if config.Node.LegacyHandshake {
 				log.Info("The legacy handshake endpoint is on: [node] legacy_handshake")

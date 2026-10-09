@@ -86,29 +86,35 @@ func TestClearSessions(t *testing.T) {
 // the table: a cleared session's wallet address and peer key must be gone
 // from the bytes on disk. A file opened with secure_delete is clean at once;
 // one written without it (by an earlier release) still holds them until
-// compactDatabase runs.
+// compactDatabase runs. The node's file is opened with OpenDatabase, the one
+// door start uses too.
 //
 // Rules: [PV-4].
 func TestDeletedSessionsLeaveNoTrace(t *testing.T) {
 	const address, key = "sent1tracemarkeraddress", "tracemarkerpeerkey"
 
+	// earlierRelease opens the file as releases before secure_delete did.
+	earlierRelease := func(path string) (*gorm.DB, error) {
+		db, err := gorm.Open(sqlite.Open(path), &gorm.Config{Logger: gormlogger.Discard})
+		if err != nil {
+			return nil, err
+		}
+		return db, db.AutoMigrate(&types.Session{})
+	}
 	for _, tc := range []struct {
 		name      string
-		params    string
+		open      func(path string) (*gorm.DB, error)
 		compact   bool
 		wantTrace bool
 	}{
-		{name: "secure_delete", params: "?_secure_delete=on"},
-		{name: "earlier release, compacted", compact: true},
-		{name: "earlier release, not compacted", wantTrace: true},
+		{name: "opened as the node opens it", open: OpenDatabase},
+		{name: "earlier release, compacted", open: earlierRelease, compact: true},
+		{name: "earlier release, not compacted", open: earlierRelease, wantTrace: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "data.db")
-			db, err := gorm.Open(sqlite.Open(path+tc.params), &gorm.Config{Logger: gormlogger.Discard})
+			db, err := tc.open(path)
 			if err != nil {
-				t.Fatal(err)
-			}
-			if err := db.AutoMigrate(&types.Session{}); err != nil {
 				t.Fatal(err)
 			}
 			db.Create(&types.Session{ID: 1, Key: key, Address: address})

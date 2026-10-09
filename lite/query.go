@@ -29,18 +29,30 @@ import (
 // When every remote fails the returned error names each of them, so a dead or
 // redirecting endpoint is visible instead of hiding behind the last one tried.
 func (c *Client) query(name string, fn func(ctx client.Context) error) error {
-	var errs []error
-	for i := 0; i < len(c.remotes); i++ {
-		rpc, err := rpchttp.NewWithTimeout(c.remotes[i], "/websocket", c.queryTimeout)
-		if err == nil {
-			err = fn(c.ctx.WithClient(rpc))
+	return c.eachRemote("Query failed", func(remote string) error {
+		rpc, err := rpchttp.NewWithTimeout(remote, "/websocket", c.queryTimeout)
+		if err != nil {
+			return err
 		}
+
+		return fn(c.ctx.WithClient(rpc))
+	}, "name", name)
+}
+
+// eachRemote calls fn with each RPC remote in turn until one succeeds. A
+// remote that fails is logged with failed and keyvals, and the next one is
+// tried: one that redirects or refuses must not stop the node while another
+// works. When all fail, the error names every remote with its own error.
+func (c *Client) eachRemote(failed string, fn func(remote string) error, keyvals ...interface{}) error {
+	var errs []error
+	for _, remote := range c.remotes {
+		err := fn(remote)
 		if err == nil {
 			return nil
 		}
 
-		c.log.Info("Query failed", "name", name, "remote", c.remotes[i], "error", err)
-		errs = append(errs, fmt.Errorf("%s: %w", c.remotes[i], err))
+		c.log.Info(failed, append(append([]interface{}{}, keyvals...), "remote", remote, "error", err)...)
+		errs = append(errs, fmt.Errorf("%s: %w", remote, err))
 	}
 
 	return errors.Join(errs...)

@@ -96,7 +96,7 @@ func unstoppedReturns(fset *token.FileSet, stmts []ast.Stmt, stopped bool, defer
 //
 // Rules: [RT-2].
 func TestStartStopsTheServiceOnEveryExit(t *testing.T) {
-	t.Skip("known bug B2: four steps after service.Start() return without stopping it; fix awaiting approval")
+	t.Skip("known bug B2: steps after service.Start() return without stopping it; fix awaiting approval")
 
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, filepath.Join(root(t), "cmd", "start.go"), nil, 0)
@@ -226,5 +226,96 @@ func TestUnstoppedReturnsChecker(t *testing.T) {
 		if got := unstoppedReturns(fset, f.Decls[0].(*ast.FuncDecl).Body.List, false, &deferred); len(got) != c.bad {
 			t.Errorf("%s: %d unstopped returns %v, want %d", c.name, len(got), got, c.bad)
 		}
+	}
+}
+
+// databaseOpens lists where a Go file calls Open from gorm or its sqlite
+// driver, whatever name it imports them under.
+func databaseOpens(t *testing.T, fset *token.FileSet, rel string) []string {
+	t.Helper()
+	file, err := parser.ParseFile(fset, filepath.Join(root(t), rel), nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pkgs := map[string]bool{}
+	for _, imp := range file.Imports {
+		path, _ := strconv.Unquote(imp.Path.Value)
+		if path != "gorm.io/gorm" && path != "gorm.io/driver/sqlite" {
+			continue
+		}
+		name := path[strings.LastIndex(path, "/")+1:]
+		if imp.Name != nil {
+			name = imp.Name.Name
+		}
+		pkgs[name] = true
+	}
+	var found []string
+	ast.Inspect(file, func(n ast.Node) bool {
+		if call, ok := n.(*ast.CallExpr); ok {
+			if sel, ok := call.Fun.(*ast.SelectorExpr); ok && sel.Sel.Name == "Open" {
+				if id, ok := sel.X.(*ast.Ident); ok && pkgs[id.Name] {
+					found = append(found, fset.Position(call.Pos()).String())
+				}
+			}
+		}
+		return true
+	})
+
+	return found
+}
+
+// TestOneDoorToTheDatabase: the node opens its session database in one
+// place, node.OpenDatabase, so the way it is opened (secure_delete) is the
+// way the tests open it.
+//
+// Rules: [PV-4].
+func TestOneDoorToTheDatabase(t *testing.T) {
+	const door = "node/database.go"
+	fset := token.NewFileSet()
+	if len(databaseOpens(t, fset, door)) == 0 {
+		t.Fatalf("%s opens no database: re-aim this test at the function that does", door)
+	}
+	for _, f := range files(t, "*.go") {
+		if f == door || strings.HasSuffix(f, "_test.go") {
+			continue
+		}
+		for _, pos := range databaseOpens(t, fset, f) {
+			t.Errorf("%s opens a database outside %s: call node.OpenDatabase instead", pos, door)
+		}
+	}
+}
+
+// TestOneLoopOverTheRemotes: the chain client reads its list of RPC remotes
+// in one place, the loop that tries each in turn, so queries, broadcasts and
+// gas estimates cannot drift from what the loop's test checks.
+//
+// Rules: [CH-8].
+func TestOneLoopOverTheRemotes(t *testing.T) {
+	fset := token.NewFileSet()
+	readers := map[string]int{}
+	for _, f := range files(t, "lite/*.go") {
+		if strings.HasSuffix(f, "_test.go") {
+			continue
+		}
+		file, err := parser.ParseFile(fset, filepath.Join(root(t), f), nil, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, d := range file.Decls {
+			fd, ok := d.(*ast.FuncDecl)
+			if !ok {
+				continue
+			}
+			ast.Inspect(fd, func(n ast.Node) bool {
+				if sel, ok := n.(*ast.SelectorExpr); ok && sel.Sel.Name == "remotes" {
+					readers[fd.Name.Name]++
+				}
+				return true
+			})
+		}
+	}
+	delete(readers, "WithRemotes") // the setter
+	if len(readers) != 1 || readers["eachRemote"] != 1 {
+		t.Fatalf("the remote list is read by %v; only eachRemote may loop over it", readers)
 	}
 }

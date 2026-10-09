@@ -12,6 +12,7 @@ import (
 )
 
 func RegisterRoutes(ctx *context.Context, r gin.IRouter) {
+	r.Use(allowBrowsers())
 	r.Use(serverHeader())
 	r.Use(replySigningHeader())
 	r.Use(logRefusals(ctx))

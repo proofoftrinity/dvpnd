@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -124,6 +125,34 @@ func TestLimitHandshakes(t *testing.T) {
 	}
 	if strings.Contains(buf.String(), "203.0.113.9") {
 		t.Fatalf("the limiter must not log client addresses:\n%s", buf.String())
+	}
+}
+
+// TestForwardedHeadersDoNotEscapeTheLimit: the limit counts the address the
+// connection came from. A client that writes a new X-Forwarded-For or
+// X-Real-IP on each attempt is still one client; the engine is gin's default,
+// which trusts those headers from anyone.
+//
+// Rules: [HS-3].
+func TestForwardedHeadersDoNotEscapeTheLimit(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	ctx := context.NewContext().WithLogger(cmtlog.NewNopLogger())
+	r := gin.New()
+	r.POST("/", limitHandshakes(ctx, newRateLimiter(2, time.Minute)), func(c *gin.Context) { c.Status(http.StatusOK) })
+
+	codes := map[int]int{}
+	for i := 0; i < 5; i++ {
+		req := httptest.NewRequest(http.MethodPost, "/", nil)
+		req.RemoteAddr = "203.0.113.9:4242"
+		req.Header.Set("X-Forwarded-For", fmt.Sprintf("198.51.100.%d", i))
+		req.Header.Set("X-Real-IP", fmt.Sprintf("198.51.100.%d", i))
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, req)
+		codes[rec.Code]++
+	}
+	if codes[http.StatusOK] != 2 || codes[http.StatusTooManyRequests] != 3 {
+		t.Fatalf("five attempts from one connection address with five forwarded addresses: %v, want 2 admitted and 3 refused", codes)
 	}
 }
 
