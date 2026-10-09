@@ -1,8 +1,7 @@
 {
   "pending": {},
   "partial": {
-    "SL-12": "a panicking job and each pass's error handling are tested; the job loops that log and retry are not",
-    "SL-15": "the test checks that gorm's map update writes a zero, but calls gorm itself rather than the update in node/jobs.go; a struct update there would pass"
+    "SL-12": "a panicking job and each pass's error handling are tested; the job loops that log and retry are not"
   },
   "manual": {
     "LIC-7": "checked by go-licenses in the Licence gate job of .github/workflows/ci.yml on every push and pull request; it needs the network, so no local test runs it. Re-check by hand after a dependency change with the command in that job"

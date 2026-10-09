@@ -546,6 +546,21 @@
         "go test -count=1 -run '^TestStartStopsTheServiceOnEveryExit$' ./test/static/"
       ],
       "expect": "--- FAIL"
+    },
+    {
+      "name": "[SL-15] the usage update is a struct update, which skips a zero",
+      "file": "node/jobs.go",
+      "find": [
+        "\t\t\tmap[string]interface{}{",
+        "\t\t\t\t\"upload\":   upload,",
+        "\t\t\t\t\"download\": download,",
+        "\t\t\t},"
+      ],
+      "replace": "\t\t\t&types.Session{Upload: upload, Download: download},",
+      "run": [
+        "go test -count=1 -run '^(TestUsageUpdateWritesBothColumns)$' ./node/"
+      ],
+      "expect": "--- FAIL"
     }
   ]
 }

@@ -5,10 +5,6 @@ package node
 import (
 	"testing"
 
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
-	gormlogger "gorm.io/gorm/logger"
-
 	"github.com/trinitystake/dvpnd/v9/types"
 )
 
@@ -51,27 +47,21 @@ func TestReportedUsage(t *testing.T) {
 	}
 }
 
-// The counter update names its columns so a zero download is written too
-// (a struct update would skip it as a zero value).
+// The usage pass names its columns so a zero download is written too (a
+// struct update would skip it as a zero value and leave the old figure).
 //
 // Rules: [SL-15].
 func TestUsageUpdateWritesBothColumns(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{Logger: gormlogger.Discard})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := db.AutoMigrate(&types.Session{}); err != nil {
-		t.Fatal(err)
-	}
-	db.Create(&types.Session{ID: 1, Key: "a", Address: "addr1", Upload: 5, Download: 7})
-
-	db.Model(&types.Session{}).Where(&types.Session{ID: 1}).Updates(
-		map[string]interface{}{"upload": int64(9), "download": int64(0)},
+	n, _, db := usageRig(t,
+		[]types.Session{{ID: 1, Key: key(1), Address: "a", Upload: 5, Download: 7}},
+		types.Peer{Key: key(1), Upload: 9, Download: 0},
 	)
 
-	var item types.Session
-	db.Model(&types.Session{}).Where(&types.Session{ID: 1}).First(&item)
-	if item.Upload != 9 || item.Download != 0 {
-		t.Fatalf("got upload=%d download=%d, want 9 and 0", item.Upload, item.Download)
+	if err := n.setSessions(); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := row(t, db, 1); got.Upload != 9 || got.Download != 0 {
+		t.Fatalf("stored upload %d download %d, want 9 and 0", got.Upload, got.Download)
 	}
 }
