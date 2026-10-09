@@ -4,9 +4,10 @@
 [![Go](https://img.shields.io/github/go-mod/go-version/proofoftrinity/dvpnd)](go.mod)
 
 `dvpnd` is an open source dVPN node daemon for the Sentinel blockchain (chain ID
-`sentinelhub-2`). It registers the node on-chain, serves WireGuard or V2Ray sessions to
-subscribers, and reports usage. It is licensed under the Apache License 2.0 and is not
-affiliated with Sentinel or Nordic DApps Inc. — see the provenance section below.
+`sentinelhub-2`). It registers the node on-chain, serves VPN sessions over WireGuard,
+AmneziaWG, OpenVPN, V2Ray, XRAY or Hysteria2, and reports usage. It is licensed under the
+Apache License 2.0 and is not affiliated with Sentinel or Nordic DApps Inc. — see the
+provenance section below.
 
 ## Status
 
@@ -37,8 +38,14 @@ was refused, a kicked Hysteria2 client lost its connection, a removed OpenVPN cl
 killed and denied on reconnect, and the per-peer counters the node reports moved
 accordingly.
 
-Not yet exercised: V2Ray nodes, sessions for the four new protocols bought on the live
-network, hourly and plan-subscription sessions, and a connection from a stock client app
+Verified on a public node on the live network as well: paid sessions over Hysteria2, XRAY
+(TLS and REALITY), V2Ray, WireGuard and both AmneziaWG tiers, with the client side driven by
+`tools/e2e`; and on a Hysteria2 node, gigabyte and hourly sessions opened by clients on the
+network, Katacomb among them. Through a client's tunnel the provider's metadata service and
+outgoing mail were refused, and the chain recorded the bytes and duration the node reported
+exactly as the node had stored them.
+
+Not yet exercised on the live network: OpenVPN, and plan-subscription sessions
 (`lite/live_test.go` covers read-only queries, opt-in via `DVPND_LIVE_RPC`).
 
 The node adapts its update cadence to the chain: it never lets `interval_update_status` or
