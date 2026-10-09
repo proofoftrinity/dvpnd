@@ -31,3 +31,6 @@ the node must not leave a tunnel, a rule or a process behind when it stops. IDs 
 - **[RT-9] A configuration file written by an earlier release still starts the node.**
   Files without `[egress]`, without V2Ray's `[api]`, without AmneziaWG's `[v3]` or with
   OpenVPN's old management port read as before; an upgrade must not need a hand edit.
+- **[RT-10] A command that fails exits with a non-zero status.** The installer runs
+  under `set -e`, and systemd and Docker read the status: a failure reported as success
+  goes unnoticed, and a node that could not start was logged as "Deactivated successfully".

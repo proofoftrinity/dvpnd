@@ -4,6 +4,8 @@
 package main
 
 import (
+	"os"
+
 	"github.com/cosmos/cosmos-sdk/client/flags"
 	"github.com/cosmos/cosmos-sdk/version"
 	base "github.com/sentinel-official/sentinelhub/v12/types"
@@ -40,5 +42,7 @@ func main() {
 	_ = viper.BindPFlag(flags.FlagLogFormat, root.PersistentFlags().Lookup(flags.FlagLogFormat))
 	_ = viper.BindPFlag(flags.FlagLogLevel, root.PersistentFlags().Lookup(flags.FlagLogLevel))
 
-	_ = root.Execute()
+	if err := root.Execute(); err != nil {
+		os.Exit(1)
+	}
 }
