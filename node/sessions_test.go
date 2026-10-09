@@ -164,8 +164,6 @@ func TestSetSessionsRemovesUnknownAndExhaustedPeers(t *testing.T) {
 //
 // Rules: [SL-3].
 func TestSetSessionsStoresDownloadOnlyUsage(t *testing.T) {
-	t.Skip("known bug B1: reportedUsage counts a peer as moved only when its upload changed; fix awaiting approval")
-
 	n, service, db := usageRig(t,
 		[]types.Session{
 			{ID: 1, Key: key(1), Address: "a", Available: 1000, Upload: 10, Download: 20},

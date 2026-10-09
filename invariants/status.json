@@ -1,6 +1,5 @@
 {
   "pending": {
-    "SL-3": "known bug B1: node/sessions_test.go's TestSetSessionsStoresDownloadOnlyUsage shows download-only usage is not stored and the allocation not checked; it is skipped until the fix is approved",
     "RT-2": "known bug B2: test/static's TestStartStopsTheServiceOnEveryExit finds returns after service.Start() that do not stop the service; it is skipped until the fix is approved",
     "LIC-7": "checked by go-licenses in the CI licence gate only; P4 decides whether it becomes manual"
   },

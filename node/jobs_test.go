@@ -16,7 +16,7 @@ import (
 // the service's counters start again from zero, so the totals must be built
 // on what the chain already held or the chain refuses the report.
 //
-// Rules: [SL-2].
+// Rules: [SL-2], [SL-3].
 func TestReportedUsage(t *testing.T) {
 	cases := []struct {
 		name             string
@@ -38,6 +38,9 @@ func TestReportedUsage(t *testing.T) {
 		{"already stored, counters unchanged",
 			types.Session{Upload: 310, Download: 420, BaseUpload: 300, BaseDownload: 400},
 			types.Peer{Upload: 10, Download: 20}, 310, 420, false},
+		{"only the download moved",
+			types.Session{Upload: 310, Download: 420, BaseUpload: 300, BaseDownload: 400},
+			types.Peer{Upload: 10, Download: 90}, 310, 490, true},
 	}
 	for _, c := range cases {
 		up, down, moved := reportedUsage(c.item, c.peer)

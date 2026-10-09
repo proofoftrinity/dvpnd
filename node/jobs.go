@@ -103,12 +103,12 @@ func (n *Node) setSessions() error {
 // reportedUsage turns the service's per-peer counters, which count from the
 // moment the peer was added, into the session totals to store and report:
 // what the chain held when the peer was admitted plus what moved since. moved
-// is false when the peer has not sent anything since the last pass.
+// is false when nothing moved in either direction since the last pass.
 func reportedUsage(item types.Session, peer types.Peer) (upload, download int64, moved bool) {
 	upload = item.BaseUpload + peer.Upload
 	download = item.BaseDownload + peer.Download
 
-	return upload, download, upload != item.Upload
+	return upload, download, upload != item.Upload || download != item.Download
 }
 
 // jobUpdateStatus keeps the node marked active on-chain. It runs once

@@ -516,6 +516,16 @@
         "go test -count=1 -run '^(TestEvaluateGrants)$' ./lite/"
       ],
       "expect": "--- FAIL"
+    },
+    {
+      "name": "[SL-3] usage counts as moved only when the upload grew",
+      "file": "node/jobs.go",
+      "find": "\treturn upload, download, upload != item.Upload || download != item.Download",
+      "replace": "\treturn upload, download, upload != item.Upload",
+      "run": [
+        "go test -count=1 -run '^(TestReportedUsage|TestSetSessionsStoresDownloadOnlyUsage)$' ./node/"
+      ],
+      "expect": "--- FAIL"
     }
   ]
 }
