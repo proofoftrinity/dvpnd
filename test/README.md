@@ -49,7 +49,9 @@ not yet.
   one place (`lite`'s `eachRemote`), the node's jobs run by one loop
   (`runJob`) and every `apt-get` of the installer run by `apt_get`, so their
   tests cover every caller (the installer's wrapper runs against a fake
-  `apt-get` that reports the lock taken);
+  `apt-get` that reports the lock taken), and the installer's `safe.directory`
+  entry added only by `trust_source`, which runs twice against a git
+  configuration of the test's own and must leave one entry;
 - the same SPDX and `sentinel-go-sdk` checks as shell steps, and
   `docs/provenance/verify-fork.sh`, which also asks apache.org,
   proxy.golang.org and Software Heritage when it can reach them (an

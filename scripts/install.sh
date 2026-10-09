@@ -280,8 +280,15 @@ go version
 # ---------------------------------------------------------------- build
 
 log "Building dvpnd (this takes a few minutes the first time)"
-# The Makefile stamps the version from git; git refuses a tree owned by another user.
-[[ -d "${SRC}/.git" ]] && git config --global --add safe.directory "${SRC}" >/dev/null 2>&1 || true
+# trust_source lets git read SRC, which the Makefile needs to stamp the version:
+# git refuses a tree owned by another user. The entry replaces every entry for
+# SRC (matched as text, not as a pattern), so a re-run adds nothing and the
+# copies earlier versions of this installer added become one.
+trust_source() {
+  [[ -d "${SRC}/.git" ]] || return 0
+  git config --global --replace-all --fixed-value safe.directory "${SRC}" "${SRC}" >/dev/null 2>&1 || true
+}
+trust_source
 ( cd "${SRC}" && make build )
 install -m 0755 "${SRC}/bin/dvpnd" /usr/local/bin/dvpnd
 /usr/local/bin/dvpnd version

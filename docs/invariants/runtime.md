@@ -37,3 +37,7 @@ the node must not leave a tunnel, a rule or a process behind when it stops. IDs 
 - **[RT-11] The installer waits for the package manager rather than failing when it is busy.**
   A fresh server runs unattended-upgrades in its first minutes, when an operator runs the
   installer; its first `apt-get` found the lock taken and the install stopped (exit 100).
+- **[RT-12] Running the installer again adds nothing to root's git configuration.** The
+  build needs a `safe.directory` entry for the source tree, and an upgrade is a re-run:
+  each run added another copy. A run leaves one entry for the tree, folds the copies
+  earlier runs left into it, and keeps the operator's own entries.
