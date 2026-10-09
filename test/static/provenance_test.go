@@ -63,12 +63,7 @@ func TestNoSentinelGoSDK(t *testing.T) {
 // knownUnmarked lists upstream files changed in substance that do not say so
 // yet. Each entry is a known bug waiting for its fix; the test fails once an
 // entry is no longer true, so the list can only shrink.
-var knownUnmarked = map[string]string{
-	"api/status/responses.go":      "known bug B3, fix awaiting approval",
-	"libs/geoip/types/location.go": "known bug B3, fix awaiting approval",
-	"types/session.go":             "known bug B3, fix awaiting approval",
-	"utils/keys.go":                "known bug B3, fix awaiting approval",
-}
+var knownUnmarked = map[string]string{}
 
 // substance is a Go file's content as a multiset of lines, ignoring what does
 // not change what the file says: the licence header lines, blank lines,
