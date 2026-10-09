@@ -19,8 +19,10 @@ unlicensed code (`NOTICE`, `CONTRIBUTING.md`). IDs as in `test/README.md`.
 - **[LIC-6] No wallet or node address is committed.** The chain is public, so an
   address in this public repository links the maintainer's GitHub identity to wallets.
   Test fixtures use synthetic keys; an address that must appear is listed with its reason.
-- **[LIC-7] Every dependency carries a permissive or weak-copyleft licence.** The CI
-  licence gate refuses forbidden, restricted and unknown licences.
+- **[LIC-7] Every dependency carries a permissive or weak-copyleft licence.** Strong
+  copyleft, network copyleft, source-available and unknown licences are refused, and so is
+  a package with no licence file. The static test reads the licences from the module cache;
+  the CI licence gate checks them again with go-licenses.
 - **[LIC-8] Every link, module path and image name uses the account's current name.**
   The account that owns the repository was renamed. GitHub redirects a former name only
   until someone else registers it; from then on a link to it serves a stranger's code, and

@@ -41,10 +41,13 @@ not yet.
   first in every Go file, no `sentinel-go-sdk` in `go.mod`, `go.sum` or any
   import, the notice on every upstream file changed in substance, `LICENSE` as
   the fork point had it, the provenance script passing offline, no wallet or
-  node address in any committed file, every protocol in the integration suite,
+  node address in any committed file, every dependency's licence (read from the
+  module cache with the network off; CI checks it again with go-licenses), no
+  link to the account's former name, every protocol in the integration suite,
   the start command stopping the service on every exit, the session database
-  opened in one place (`node.OpenDatabase`) and the RPC remotes looped over in
-  one place (`lite`'s `eachRemote`), so their tests cover every caller;
+  opened in one place (`node.OpenDatabase`), the RPC remotes looped over in
+  one place (`lite`'s `eachRemote`) and the node's jobs run by one loop
+  (`runJob`), so their tests cover every caller;
 - the same SPDX and `sentinel-go-sdk` checks as shell steps, and
   `docs/provenance/verify-fork.sh`, which also asks apache.org,
   proxy.golang.org and Software Heritage when it can reach them (an
