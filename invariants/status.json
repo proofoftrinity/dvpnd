@@ -6,7 +6,8 @@
   },
   "partial": {
     "SL-12": "a panicking job and each pass's error handling are tested; the job loops that log and retry are not",
-    "LIC-3": "the four files of known bug B3 are listed in knownUnmarked in test/static/provenance_test.go until the fix is approved; every other file is checked"
+    "LIC-3": "the four files of known bug B3 are listed in knownUnmarked in test/static/provenance_test.go until the fix is approved; every other file is checked",
+    "SL-15": "the test checks that gorm's map update writes a zero, but calls gorm itself rather than the update in node/jobs.go; a struct update there would pass"
   },
   "manual": {}
 }

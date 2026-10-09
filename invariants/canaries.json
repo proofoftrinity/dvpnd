@@ -5,7 +5,7 @@
   },
   "unsetEnv": [],
   "concurrency": 0,
-  "timeout": 600,
+  "timeout": 300,
   "canaries": [
     {
       "name": "[SL-2] the reported upload ignores what the chain already held",
@@ -44,6 +44,476 @@
       "replace": "sqlite.Open(path)",
       "run": [
         "go test -count=1 -run '^TestDeletedSessionsLeaveNoTrace$' ./node/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[SL-1] XRAY reports a peer under a key other than its session key",
+      "file": "services/xray/xray.go",
+      "find": "\t\t\tKey:      key,",
+      "replace": "\t\t\tKey:      \"x\" + key,",
+      "run": [
+        "go test -count=1 -run '^(TestPeersOverTheAPI)$' ./services/xray/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[SL-4] admission does not check capacity again under the lock",
+      "file": "api/session/admit.go",
+      "find": "\tif apiErr = checkCapacity(ctx, req); apiErr != nil {",
+      "replace": "\tif apiErr = (*apiError)(nil); apiErr != nil {",
+      "run": [
+        "go test -count=1 -run '^(TestConcurrentHandshakesHoldMaxPeers|TestConcurrentHandshakesForOneSession)$' ./api/session/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[SL-5] a peer whose row was not written stays connected",
+      "file": "api/session/admit.go",
+      "find": "\t\tif rmErr := ctx.Service().RemovePeer(req.PeerData); rmErr != nil {",
+      "replace": "\t\tif rmErr := error(nil); rmErr != nil {",
+      "run": [
+        "go test -count=1 -run '^(TestFailedRecordRemovesThePeer)$' ./api/session/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[SL-6] another account's session is admitted",
+      "file": "api/session/admit.go",
+      "find": "\tif session.GetAccAddress() != req.AccAddress.String() {",
+      "replace": "\tif false && session.GetAccAddress() != req.AccAddress.String() {",
+      "run": [
+        "go test -count=1 -run '^(TestAdmissionRefusals)$' ./api/session/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[SL-7] the allocation ignores what this node served but has not reported",
+      "file": "api/session/admit.go",
+      "find": "\t\t\tutilised = utilised.Add(sdkmath.NewInt(items[i].ServedBytes()))",
+      "replace": "\t\t\t_ = items[i]",
+      "run": [
+        "go test -count=1 -run '^(TestAdmissionEnforcesByteCaps)$' ./api/session/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[SL-8] an account's earlier peer is not evicted",
+      "file": "api/session/admit.go",
+      "find": "\t\tif err = ctx.RemovePeerIfExists(items[i].Key); err != nil {",
+      "replace": "\t\tif err = error(nil); err != nil {",
+      "run": [
+        "go test -count=1 -run '^(TestAnAccountKeepsOnePeer)$' ./api/session/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[SL-9] a peer with no session row stays connected",
+      "file": "node/jobs.go",
+      "find": "\t\t\tif err = n.RemovePeer(peers[i].Key); err != nil {",
+      "replace": "\t\t\tif err = error(nil); err != nil {",
+      "run": [
+        "go test -count=1 -run '^(TestSetSessionsRemovesUnknownAndExhaustedPeers)$' ./node/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[SL-9] a peer past its allocation stays connected",
+      "file": "node/jobs.go",
+      "find": "\t\tif available.IsPositive() && consumed.GT(available) {",
+      "replace": "\t\tif available.IsPositive() && consumed.GT(available) && false {",
+      "run": [
+        "go test -count=1 -run '^(TestSetSessionsRemovesUnknownAndExhaustedPeers)$' ./node/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[SL-10] a session the chain deleted keeps its row",
+      "file": "node/jobs.go",
+      "find": "\t\treturn true, true, true, nil",
+      "replace": "\t\treturn true, false, true, nil",
+      "run": [
+        "go test -count=1 -run '^(TestUpdateSessionsPass)$' ./node/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[SL-11] a session the chain ended is reported again with the others",
+      "file": "node/jobs.go",
+      "find": "\t\tif session == nil || session.GetStatus().Equal(v1base.StatusInactive) {",
+      "replace": "\t\tif false && (session == nil || session.GetStatus().Equal(v1base.StatusInactive)) {",
+      "run": [
+        "go test -count=1 -run '^(TestReportDropsASessionTheChainEnded)$' ./node/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[SL-14] a restart reports sessions the chain no longer holds active",
+      "file": "node/reconcile.go",
+      "find": "\tif !onChain.GetStatus().Equal(v1base.StatusActive) {",
+      "replace": "\tif false {",
+      "run": [
+        "go test -count=1 -run '^(TestSessionNeedsReport)$' ./node/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[SL-16] Hysteria does not kick a removed peer",
+      "file": "services/hysteria/hysteria.go",
+      "find": "\tres, err := s.statsAPI(http.MethodPost, \"/kick\", body)",
+      "replace": "\tres, err := s.statsAPI(http.MethodPost, \"/kick-nothing\", body)",
+      "run": [
+        "go test -count=1 -run '^(TestPeersAndKick)$' ./services/hysteria/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[EG-3] an IPv4-mapped IPv6 entry blocks every IPv4 address",
+      "file": "services/common/egress.go",
+      "find": "\t\t\"::1/128\",",
+      "replace": "\t\t\"::1/128\",\n\t\t\"::ffff:0:0/96\",",
+      "run": [
+        "go test -count=1 -run '^(TestBlockedNetworks)$' ./services/common/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[EG-4] a tunnel client may send mail on port 25",
+      "file": "services/common/egress.go",
+      "find": "\t\t\t\trules = append(rules, []string{\"-A\", fwd, \"-p\", \"tcp\", \"--dport\", strconv.Itoa(SMTPPort), \"-j\", \"DROP\"})",
+      "replace": "\t\t\t\t_ = SMTPPort",
+      "run": [
+        "go test -count=1 -run '^(TestTunnelEgressUpDown|TestTunnelEgressPolicy)$' ./services/common/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[EG-5] V2Ray matches a name without resolving it",
+      "file": "services/v2ray/config.go",
+      "find": "        \"domainStrategy\": \"IPIfNonMatch\",",
+      "replace": "        \"domainStrategy\": \"AsIs\",",
+      "run": [
+        "go test -count=1 -run '^(TestInitRendersEgressPolicy)$' ./services/v2ray/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[EG-6] the proxy account reaches the host's other addresses",
+      "file": "services/common/egress.go",
+      "find": "\t\t\trules = append(rules, []string{\"-A\", ProxyChain, \"-m\", \"addrtype\", \"--dst-type\", \"LOCAL\", \"-j\", \"REJECT\"})",
+      "replace": "\t\t\t_ = ProxyChain",
+      "run": [
+        "go test -count=1 -run '^(TestProxyEgress)$' ./services/common/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[EG-7] WireGuard brings the interface up without its egress chains",
+      "file": "services/wireguard/wireguard.go",
+      "find": "\tif err = s.egress().Up(); err != nil {",
+      "replace": "\tif err = error(nil); err != nil {",
+      "run": [
+        "go test -count=1 -run '^(TestStartFiltersBeforeTheInterfaceComesUp)$' ./services/wireguard/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[EG-8] tunnel clients reach each other",
+      "file": "services/common/egress.go",
+      "find": "\t\t\trules = append(rules, []string{\"-A\", fwd, \"-o\", e.Interface, \"-j\", \"DROP\"})",
+      "replace": "\t\t\t_ = fwd",
+      "run": [
+        "go test -count=1 -run '^(TestTunnelEgressUpDown)$' ./services/common/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[EG-10] a rule the kernel refuses is ignored",
+      "file": "services/common/egress.go",
+      "find": "\t\t\tif err := run(f.tool, rule...); err != nil {",
+      "replace": "\t\t\tif err := run(f.tool, rule...); err != nil && false {",
+      "run": [
+        "go test -count=1 -run '^(TestTunnelEgressFailure)$' ./services/common/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[HS-1] the client's signature need not cover the session id",
+      "file": "api/session/handshake.go",
+      "find": "\t\tmessage = append(sdk.Uint64ToBigEndian(body.ID), data...)",
+      "replace": "\t\tmessage = data",
+      "run": [
+        "go test -count=1 -run '^(TestVerifyHandshake)$' ./api/session/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[HS-3] the handshake limit trusts forwarded headers",
+      "file": "api/session/guard.go",
+      "find": "l.allow(clientBlock(c.RemoteIP()))",
+      "replace": "l.allow(clientBlock(c.ClientIP()))",
+      "run": [
+        "go test -count=1 -run '^(TestForwardedHeadersDoNotEscapeTheLimit)$' ./api/session/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[HS-4] the replayable legacy endpoint is always on",
+      "file": "api/session/routes.go",
+      "find": "\tif ctx.Config().Node.LegacyHandshake {",
+      "replace": "\tif true {",
+      "run": [
+        "go test -count=1 -run '^(TestLegacyEndpointOffByDefault)$' ./api/session/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[HS-6] the signed digest drops its domain",
+      "file": "api/session/reply.go",
+      "find": "const replyDomain = \"dvpnd/handshake-reply/v1\"",
+      "replace": "const replyDomain = \"\"",
+      "run": [
+        "go test -count=1 -run '^(TestReplyDigestVector|TestSignedReply)$' ./api/session/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[HS-8] a failure inside the node reaches the client in full",
+      "file": "api/session/admit.go",
+      "find": "\tif status >= http.StatusInternalServerError {",
+      "replace": "\tif false {",
+      "run": [
+        "go test -count=1 -run '^(TestReplyErrorHidesNodeFailures)$' ./api/session/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[HS-13] V2Ray accepts the legacy VMess header",
+      "file": "services/v2ray/v2ray.go",
+      "find": "\t\t[]string{\"run\", \"--config\", s.configPath}, nil, s.config.VMess.ListenPort)",
+      "replace": "\t\t[]string{\"run\", \"--config\", s.configPath}, []string{\"V2RAY_VMESS_AEAD_FORCED=false\"}, s.config.VMess.ListenPort)",
+      "run": [
+        "go test -count=1 -run '^(TestVMessAEADOnly)$' ./services/v2ray/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[PV-1] a refused request logs the client's address at the default level",
+      "file": "api/logging.go",
+      "find": "\t\tctx.Log().Error(\"Request refused\",",
+      "replace": "\t\tctx.Log().Error(\"Request refused\", \"client\", c.RemoteIP(),",
+      "run": [
+        "go test -count=1 -run '^(TestLogRefusals)$' ./api/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[PV-2] XRAY logs client detail at the default level",
+      "file": "services/xray/config.go",
+      "find": "\tif common.Verbose() {",
+      "replace": "\tif common.Verbose() || true {",
+      "run": [
+        "go test -count=1 -run '^(TestLogLevelFollowsNodeLogLevel)$' ./services/xray/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[PV-2] V2Ray logs at warning",
+      "file": "services/v2ray/config.go",
+      "find": "        \"loglevel\": \"none\"",
+      "replace": "        \"loglevel\": \"warning\"",
+      "run": [
+        "go test -count=1 -run '^(TestLogsNothing)$' ./services/v2ray/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[PV-3] a peer key is logged in full",
+      "file": "types/keytag.go",
+      "find": "\treturn hex.EncodeToString(sum[:6])",
+      "replace": "\treturn key + hex.EncodeToString(sum[:0])",
+      "run": [
+        "go test -count=1 -run '^(TestKeyTag)$' ./types/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[PV-5] a recovered mnemonic is printed back",
+      "file": "cmd/keys.go",
+      "find": "\t\t\tif !recoverKey {",
+      "replace": "\t\t\tif true {",
+      "run": [
+        "go test -count=1 -run '^(TestKeysAddShowsOnlyANewMnemonic)$' ./cmd/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[PV-6] an existing config file keeps a mode others can read",
+      "file": "utils/file.go",
+      "find": "\treturn os.Chmod(path, 0o600)",
+      "replace": "\treturn nil",
+      "run": [
+        "go test -count=1 -run '^(TestWritePrivateFile)$' ./utils/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[PV-7] the GeoIP token is logged",
+      "file": "types/config.go",
+      "find": "\t\tgeoip.Token = \"<redacted>\"",
+      "replace": "\t\t_ = geoip",
+      "run": [
+        "go test -count=1 -run '^(TestConfigRedacted)$' ./types/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[PV-8] the Handshake resolver listens on every address",
+      "file": "cmd/start.go",
+      "find": "\t\t\"--rs-host\", net.JoinHostPort(host.String(), \"53\"),",
+      "replace": "\t\t\"--rs-host\", net.JoinHostPort(\"0.0.0.0\", \"53\"),",
+      "run": [
+        "go test -count=1 -run '^(TestHnsdArgs)$' ./cmd/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[CT-9] the pool hands out the broadcast address",
+      "file": "services/wireguard/types/ip_pool.go",
+      "find": "\t\tfor p.current[3] == 0 || p.current[3] == 255 {",
+      "replace": "\t\tfor p.current[3] == 0 {",
+      "run": [
+        "go test -count=1 -run '^(TestIPv4PoolHandsOutEachAddressOnce)$' ./services/wireguard/types/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[CH-1] a plain-http RPC on another host is accepted",
+      "file": "types/config.go",
+      "find": "\t\tif uri.Scheme == \"http\" && !loopbackHost(uri.Hostname()) {",
+      "replace": "\t\tif false {",
+      "run": [
+        "go test -count=1 -run '^(TestRPCAddressesNeedTLS)$' ./types/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[CH-2] a hot key sends the node's messages without MsgExec",
+      "file": "lite/authz.go",
+      "find": "\tif c.granter == nil {\n\t\treturn messages\n\t}",
+      "replace": "\tif true {\n\t\treturn messages\n\t}",
+      "run": [
+        "go test -count=1 -run '^(TestHotKeyTransactions)$' ./lite/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[CH-3] the signing key is accepted as its own granter",
+      "file": "cmd/start.go",
+      "find": "\tif granter.Equals(signer) {",
+      "replace": "\tif false {",
+      "run": [
+        "go test -count=1 -run '^(TestGranterOf)$' ./cmd/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[CH-5] a missing grant reads as an RPC failure",
+      "file": "lite/authz.go",
+      "find": "\treturn err != nil && strings.Contains(err.Error(), authz.ErrNoAuthorizationFound.Error())",
+      "replace": "\treturn false && err != nil && strings.Contains(err.Error(), authz.ErrNoAuthorizationFound.Error())",
+      "run": [
+        "go test -count=1 -run '^(TestNoAuthorization)$' ./lite/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[CH-8] the remote loop gives up after one failure",
+      "file": "lite/query.go",
+      "find": "\t\terrs = append(errs, fmt.Errorf(\"%s: %w\", remote, err))\n",
+      "replace": "\t\terrs = append(errs, fmt.Errorf(\"%s: %w\", remote, err))\n\t\treturn errors.Join(errs...)\n",
+      "run": [
+        "go test -count=1 -run '^(TestEveryRemoteIsTried)$' ./lite/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[RT-1] the daemons run as root",
+      "file": "services/common/runtime.go",
+      "find": "\t\tCredential: &syscall.Credential{Uid: rt.Proxy.UID, Gid: rt.Proxy.GID, Groups: []uint32{}},",
+      "replace": "\t\tCredential: &syscall.Credential{Uid: 0, Gid: 0, Groups: []uint32{}},",
+      "run": [
+        "go test -count=1 -run '^(TestProxyAttr)$' ./services/common/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[RT-3] a daemon that ignores SIGTERM is never killed",
+      "file": "services/common/process.go",
+      "find": "\tif err := p.cmd.Process.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) {",
+      "replace": "\tif err := error(nil); err != nil {",
+      "run": [
+        "go test -count=1 -run '^(TestStopKillsChildThatIgnoresTerm)$' ./services/v2ray/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[SL-13] the update intervals may reach the chain's whole status_timeout",
+      "file": "cmd/start.go",
+      "find": "\tif limit = statusTimeout * 4 / 5; limit > 0 && configured > limit {",
+      "replace": "\tif limit = statusTimeout; limit > 0 && configured > limit {",
+      "run": [
+        "go test -count=1 -run '^(TestFitInterval)$' ./cmd/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[EG-1] Hysteria renders a blocked list of its own",
+      "file": "services/hysteria/hysteria.go",
+      "find": "\t\tBlockedNetworks: common.BlockedNetworks(),",
+      "replace": "\t\tBlockedNetworks: common.BlockedNetworksV4,",
+      "run": [
+        "go test -count=1 -run '^(TestInitRendersEgressPolicy)$' ./services/hysteria/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[EG-9] a chain left by a dead node is not emptied before it is refilled",
+      "file": "services/common/egress.go",
+      "find": "\t\t\t\tif err := run(f.tool, \"-F\", chain); err != nil {",
+      "replace": "\t\t\t\tif err := error(nil); err != nil {",
+      "run": [
+        "go test -count=1 -run '^(TestTunnelEgressUpDown)$' ./services/common/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[HS-5] a successful handshake reply goes out unsigned",
+      "file": "api/session/handshake.go",
+      "find": "\t\t\tc.Header(ReplySignatureHeader, header)",
+      "replace": "\t\t\t_ = header",
+      "run": [
+        "go test -count=1 -run '^(TestSignedReply|TestHandshakeReplyIsSigned)$' ./api/session/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[HS-7] browsers cannot read the reply's signature",
+      "file": "api/cors.go",
+      "find": "\t\tExposeHeaders:   []string{session.ReplySignatureHeader, session.ReplySigningHeader},",
+      "replace": "\t\tExposeHeaders:   []string{session.ReplySigningHeader},",
+      "run": [
+        "go test -count=1 -run '^(TestBrowsersCanReadTheSignature)$' ./api/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[CH-4] a hot key without its grant starts anyway",
+      "file": "lite/grants.go",
+      "find": "\t\t\tproblems = append(problems, \"no authz grant for \"+url)",
+      "replace": "\t\t\t_ = url",
+      "run": [
+        "go test -count=1 -run '^(TestEvaluateGrants)$' ./lite/"
       ],
       "expect": "--- FAIL"
     }

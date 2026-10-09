@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -95,9 +97,27 @@ func TestStopKillsChildThatIgnoresTerm(t *testing.T) {
 	stopTimeout = 300 * time.Millisecond
 	t.Cleanup(func() { stopTimeout = saved })
 
-	s := startStub(t, "trap '' TERM")
-	if err := s.Stop(); err != nil {
-		t.Fatalf("Stop: %v", err)
+	// The child writes its pid, so a Stop that never kills it cannot leave
+	// it running after the test.
+	pidFile := filepath.Join(t.TempDir(), "pid")
+	s := startStub(t, "echo $$ > "+pidFile+"\ntrap '' TERM")
+	t.Cleanup(func() {
+		if raw, err := os.ReadFile(pidFile); err == nil {
+			if pid, err := strconv.Atoi(strings.TrimSpace(string(raw))); err == nil {
+				_ = syscall.Kill(pid, syscall.SIGKILL)
+			}
+		}
+	})
+
+	done := make(chan error, 1)
+	go func() { done <- s.Stop() }()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("Stop: %v", err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("Stop did not return 10 s after a 300 ms timeout: the child that ignores SIGTERM was never killed")
 	}
 	if exited, state := s.process.Exited(); !exited || state.Success() {
 		t.Fatal("child should have been killed")

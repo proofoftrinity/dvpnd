@@ -113,6 +113,13 @@ func nodeAddrs(ctx *context.Context) []string {
 
 // HandlerHandshake serves POST / for current client apps.
 func HandlerHandshake(ctx *context.Context) gin.HandlerFunc {
+	return handshake(ctx, ctx.Client(), ctx.Client())
+}
+
+// handshake is HandlerHandshake with the chain it asks about the session and
+// the key it signs the reply with given separately, so a test can stand in
+// for both.
+func handshake(ctx *context.Context, chain chainQuerier, signer replySigner) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var body HandshakeBody
 		if err := c.ShouldBindJSON(&body); err != nil {
@@ -132,7 +139,7 @@ func HandlerHandshake(ctx *context.Context) gin.HandlerFunc {
 			return
 		}
 
-		res, apiErr := admit(ctx, ctx.Client(), admitRequest{AccAddress: accAddr, ID: body.ID, PeerData: peerData})
+		res, apiErr := admit(ctx, chain, admitRequest{AccAddress: accAddr, ID: body.ID, PeerData: peerData})
 		if apiErr != nil {
 			replyError(ctx, c, apiErr.Status, apiErr.Code, apiErr.Err)
 			return
@@ -146,7 +153,7 @@ func HandlerHandshake(ctx *context.Context) gin.HandlerFunc {
 
 		// The peer is admitted by now, so a reply that cannot be signed still
 		// goes out; the client decides whether to use it.
-		if header, err := signReply(ctx.Client(), body.ID, data, result); err != nil {
+		if header, err := signReply(signer, body.ID, data, result); err != nil {
 			ctx.Log().Error("could not sign the handshake reply", "error", err)
 		} else {
 			c.Header(ReplySignatureHeader, header)
