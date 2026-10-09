@@ -571,6 +571,16 @@
         "go test -count=1 -run '^(TestAFailedPassIsTriedAgain)$' ./node/"
       ],
       "expect": "--- FAIL"
+    },
+    {
+      "name": "[EG-7] AmneziaWG leaves the default tier up when the 3.1 tier fails",
+      "file": "services/amneziawg/amneziawg.go",
+      "find": "\t\t_ = s.WireGuard.Stop()\n",
+      "replace": "",
+      "run": [
+        "go test -count=1 -run '^(TestAFailedTierLeavesNothingBehind)$' ./services/amneziawg/"
+      ],
+      "expect": "--- FAIL"
     }
   ]
 }

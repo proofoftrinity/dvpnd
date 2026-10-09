@@ -254,16 +254,23 @@ func (s *WireGuard) egress() common.TunnelEgress {
 	return common.TunnelEgress{Interface: s.config.Interface}
 }
 
-// Start installs the egress firewall, then brings the interface up, so no
-// peer packet is forwarded unfiltered. An earlier instance that died without
-// Stop leaves the interface behind and wg-quick refuses to create it again;
-// in that case it is torn down and recreated so a restart needs no manual
-// cleanup.
-func (s *WireGuard) Start() (err error) {
-	if err = EnsureForwarding(); err != nil {
+// Start turns IP forwarding on, then brings the interface up behind its
+// egress firewall.
+func (s *WireGuard) Start() error {
+	if err := EnsureForwarding(); err != nil {
 		return err
 	}
 
+	return s.Up()
+}
+
+// Up installs the egress firewall, then brings the interface up, so no peer
+// packet is forwarded unfiltered. An earlier instance that died without Stop
+// leaves the interface behind and wg-quick refuses to create it again; in
+// that case it is torn down and recreated so a restart needs no manual
+// cleanup. IP forwarding is the caller's: Start turns it on, and a variant
+// with two interfaces turns it on once.
+func (s *WireGuard) Up() (err error) {
 	if err = s.egress().Up(); err != nil {
 		s.egress().Down()
 		return err

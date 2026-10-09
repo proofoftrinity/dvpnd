@@ -51,6 +51,9 @@ var (
 	// lookPath is how Init checks for the tools; a variable so tests can
 	// stub it.
 	lookPath = exec.LookPath
+
+	// ensureForwarding turns IP forwarding on; a variable so tests can skip it.
+	ensureForwarding = wireguard.EnsureForwarding
 )
 
 // AmneziaWG is the default tier's WireGuard service plus, when the
@@ -167,16 +170,20 @@ func (s *AmneziaWG) Obfuscation() *awgtypes.Obfuscation {
 	return s.config.Obfuscation
 }
 
-// Start brings the default tier up, then the 3.1 tier; if the second fails
-// the first is taken down again, so a failed start leaves nothing behind.
+// Start turns IP forwarding on, brings the default tier up, then the 3.1
+// tier; if the second fails the first is taken down again, so a failed start
+// leaves nothing behind.
 func (s *AmneziaWG) Start() error {
-	if err := s.WireGuard.Start(); err != nil {
+	if err := ensureForwarding(); err != nil {
+		return err
+	}
+	if err := s.WireGuard.Up(); err != nil {
 		return err
 	}
 	if !s.v3On() {
 		return nil
 	}
-	if err := s.v3.Start(); err != nil {
+	if err := s.v3.Up(); err != nil {
 		_ = s.WireGuard.Stop()
 		return err
 	}
