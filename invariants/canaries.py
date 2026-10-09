@@ -13,6 +13,7 @@ Python 3.8+, standard library only.
     python3 invariants/canaries.py --only REL-1  # just the canaries whose name contains it
     python3 invariants/canaries.py --list        # names only
     --config PATH / --root PATH                  # as in registry.py
+    -h, --help                                   # this text; any other argument exits 2, running nothing
 """
 import hashlib
 import json
@@ -32,6 +33,17 @@ CONFIG = os.path.join(HERE, 'canaries.json')
 
 def option(argv, name, default):
     return argv[argv.index(name) + 1] if name in argv and argv.index(name) + 1 < len(argv) else default
+
+
+def bad_argument(argv, flags):
+    """The first argument that is not one of `flags` (name -> takes a value), or a flag missing its
+    value; None when every argument is known. A typo must not start a full run."""
+    i = 0
+    while i < len(argv):
+        if argv[i] not in flags or (flags[argv[i]] and i + 1 >= len(argv)):
+            return argv[i]
+        i += 2 if flags[argv[i]] else 1
+    return None
 
 
 def repo_root(config_dir):
@@ -141,6 +153,13 @@ def run_canary(c, template, root, cfg, slots):
 
 
 def main(argv):
+    if '-h' in argv or '--help' in argv:
+        print(__doc__.strip())
+        return 0
+    bad = bad_argument(argv, {'--only': True, '--list': False, '--config': True, '--root': True})
+    if bad:
+        print(f'canaries: unknown argument, or one missing its value: {bad!r} (see --help)', file=sys.stderr)
+        return 2
     config = os.path.abspath(option(argv, '--config', CONFIG))
     root = os.path.abspath(option(argv, '--root', '') or repo_root(os.path.dirname(config)))
     with open(config, encoding='utf-8') as fh:
