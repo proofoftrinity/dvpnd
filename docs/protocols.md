@@ -89,8 +89,8 @@ key on; the name is what `GET /` reports as `service_type`.
   the reply counts. Both headers are exposed to browsers through CORS.
 - The session key stored by the node is `base64(peer data)`; `Peers()` must return each
   peer with exactly that key, or its usage is never reported.
-- `RemovePeer` is called by the node (session expired, allocation exceeded, account
-  evicted), never by the client.
+- `RemovePeer` is called by the node (session expired, allocation exceeded, paid hours
+  used, account evicted), never by the client.
 - Egress: a client reaches the internet and nothing on the node host or around it. One
   policy in `services/common/egress.go` (the blocked IPv4 and IPv6 networks, `localhost` by
   name, TCP 25 unless `[egress] allow_smtp`) is rendered by every service, so the protocols

@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	sdkmath "cosmossdk.io/math"
 	cmtlog "github.com/cometbft/cometbft/libs/log"
@@ -143,5 +144,55 @@ func TestDeletedSessionsLeaveNoTrace(t *testing.T) {
 				t.Fatalf("deleted session left in the file: %v, want %v", trace, tc.wantTrace)
 			}
 		})
+	}
+}
+
+// TestRowsOfThePreviousReleaseLoad: the session table as 9.4.2 wrote it, with
+// a row in it, opens the way the node opens it and the row reads back, so the
+// start after an upgrade can still report what the previous run moved. The
+// columns added since (max_duration) are empty in such a row and read as
+// zero: a session without recorded hours.
+//
+// Rules: [SL-14].
+func TestRowsOfThePreviousReleaseLoad(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "data.db")
+	old, err := gorm.Open(sqlite.Open(path), &gorm.Config{Logger: gormlogger.Discard})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, stmt := range []string{
+		"CREATE TABLE `sessions` (`id` integer PRIMARY KEY AUTOINCREMENT,`created_at` datetime,`updated_at` datetime," +
+			"`deleted_at` datetime,`subscription` integer,`key` text,`address` text,`available` integer," +
+			"`download` integer,`upload` integer,`base_download` integer,`base_upload` integer,`base_duration` integer)",
+		"INSERT INTO `sessions` (`id`,`created_at`,`updated_at`,`key`,`address`,`download`,`upload`,`base_duration`) " +
+			"VALUES (7, '2026-01-02 03:04:05', '2026-01-02 04:04:05', 'YQ==', 'a', 300, 200, 60000000000)",
+	} {
+		if err := old.Exec(stmt).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	if sqlDB, err := old.DB(); err == nil {
+		_ = sqlDB.Close()
+	}
+
+	db, err := OpenDatabase(path)
+	if err != nil {
+		t.Fatalf("opening the previous release's table: %v", err)
+	}
+	t.Cleanup(func() {
+		if sqlDB, err := db.DB(); err == nil {
+			_ = sqlDB.Close()
+		}
+	})
+	var items []types.Session
+	if err := db.Model(&types.Session{}).Find(&items).Error; err != nil {
+		t.Fatalf("reading the previous release's row: %v", err)
+	}
+	if len(items) != 1 || items[0].ID != 7 || items[0].Download != 300 || items[0].Upload != 200 ||
+		items[0].Duration() != time.Hour+time.Minute {
+		t.Fatalf("read back %+v", items)
+	}
+	if items[0].MaxDuration != 0 || items[0].PaidTimeUsed(time.Now()) {
+		t.Fatalf("a row without recorded hours reads as hours %d", items[0].MaxDuration)
 	}
 }

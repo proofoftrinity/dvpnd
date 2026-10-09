@@ -87,10 +87,10 @@ type admission struct {
 	alloc *v2subscriptiontypes.Allocation
 }
 
-// admit checks the session on the chain, enforces the byte caps, evicts any
-// earlier peer of the same account, adds the peer to the VPN service and
-// records the session locally. It is shared by the legacy and the current
-// handshake endpoints.
+// admit checks the session on the chain, enforces the byte caps and the paid
+// hours, evicts any earlier peer of the same account, adds the peer to the VPN
+// service and records the session locally. It is shared by the legacy and the
+// current handshake endpoints.
 //
 // The chain queries run first, without a lock, since they take a network
 // round trip each. Everything that reads or changes the peer set and the
@@ -184,6 +184,7 @@ func admit(ctx *context.Context, chain chainQuerier, req admitRequest) (*admitRe
 		BaseDownload: baseDownload,
 		BaseUpload:   baseUpload,
 		BaseDuration: int64(a.session.GetDuration()),
+		MaxDuration:  int64(a.session.GetMaxDuration()),
 	}).Error
 	if err != nil {
 		// A peer without its row would be served unmetered until the next
@@ -237,7 +238,7 @@ func sessionExists(ctx *context.Context, where *types.Session) (bool, error) {
 }
 
 // queryAdmission asks the chain whether the session may be served here, and
-// under which byte caps.
+// under which byte caps; an hourly session must have time left.
 func queryAdmission(ctx *context.Context, chain chainQuerier, req admitRequest) (*admission, *apiError) {
 	session, err := chain.QuerySession(req.ID)
 	if err != nil {
@@ -270,6 +271,12 @@ func queryAdmission(ctx *context.Context, chain chainQuerier, req admitRequest) 
 				fmt.Errorf("session %d has used its %s bytes", session.GetID(), max))
 		}
 		a.remainingBytes = clampInt64(diff)
+	}
+	// An hourly session is paid for the duration the node reports, up to the
+	// hours it paid for: time served beyond them is never paid.
+	if max := session.GetMaxDuration(); max > 0 && session.GetDuration() >= max {
+		return nil, newAPIError(http.StatusBadRequest, 8,
+			fmt.Errorf("session %d has used its %s", session.GetID(), max))
 	}
 
 	s, ok := session.(*subscriptiontypes.Session)

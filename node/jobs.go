@@ -45,9 +45,9 @@ func (n *Node) runJob(name string, interval time.Duration, pass func() error, er
 }
 
 // setSessions stores each peer's usage and removes peers the node has no
-// session for, or that used up their allocation. It runs under the admission
-// lock, so a peer whose handshake is still writing its row is not taken for
-// an unknown one.
+// session for, or that used up their allocation or the hours their session
+// paid for. It runs under the admission lock, so a peer whose handshake is
+// still writing its row is not taken for an unknown one.
 func (n *Node) setSessions() error {
 	peers, err := n.Service().Peers()
 	if err != nil {
@@ -104,6 +104,11 @@ func (n *Node) setSessions() error {
 
 		if available.IsPositive() && consumed.GT(available) {
 			n.Log().Info("Peer allocation exceeded", "key", types.KeyTag(item.Key))
+			if err = n.RemovePeer(item.Key); err != nil {
+				errs = append(errs, err)
+			}
+		} else if item.PaidTimeUsed(time.Now()) { // served until now: the update set updated_at
+			n.Log().Info("Peer paid hours used", "key", types.KeyTag(item.Key))
 			if err = n.RemovePeer(item.Key); err != nil {
 				errs = append(errs, err)
 			}
@@ -206,6 +211,13 @@ func (n *Node) checkSession(item types.Session) (removePeer, removeSession, skip
 			n.Log().Info("Session byte limit reached", "key", types.KeyTag(item.Key),
 				"id", session.GetID(), "max_bytes", max, "used", used)
 		}
+	}
+	// The chain's max_duration also covers a row written before the node
+	// stored it.
+	if max := session.GetMaxDuration(); max > 0 && item.Duration() >= max {
+		removePeer = true
+		n.Log().Info("Session paid hours used", "key", types.KeyTag(item.Key),
+			"id", session.GetID(), "max_duration", max, "duration", item.Duration())
 	}
 	if s, ok := session.(*subscriptiontypes.Session); ok {
 		subscription, err := n.chain.QuerySubscription(s.SubscriptionID)

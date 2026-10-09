@@ -283,6 +283,59 @@ func TestUpdateSessionsPass(t *testing.T) {
 	}
 }
 
+// TestUpdateSessionsCutsOffUsedHours: the pass that asks the chain about each
+// session removes the peer of an hourly session that has used the hours it
+// paid for, and still reports its usage, which is what the node is paid on; a
+// peer with time left, or on a session without hours, stays.
+//
+// Rules: [SL-17].
+func TestUpdateSessionsCutsOffUsedHours(t *testing.T) {
+	db := testDB(t)
+	start := time.Now().Add(-2 * time.Hour)
+	served := func(id uint64, key string, d time.Duration) {
+		db.Create(&types.Session{ID: id, Key: key, Address: key, Upload: 10, Download: 10,
+			Model: gorm.Model{CreatedAt: start, UpdatedAt: start.Add(d)}})
+	}
+	served(1, "YQ==", 61*time.Minute) // "a": one hour paid
+	served(2, "Yg==", 30*time.Minute) // "b": two hours paid
+	served(3, "Yw==", 61*time.Minute) // "c": no hours, a gigabyte session
+
+	service := &peerSet{peers: map[string]bool{"a": true, "b": true, "c": true}}
+	chain := &fakeChain{sessions: map[uint64]v1base.Status{
+		1: v1base.StatusActive, 2: v1base.StatusActive, 3: v1base.StatusActive}}
+	n := NewNode(context.NewContext().WithLogger(cmtlog.NewNopLogger()).WithDatabase(db).WithService(service))
+	n.chain = &timedChain{fakeChain: chain, hours: map[uint64]time.Duration{1: time.Hour, 2: 2 * time.Hour}}
+
+	if err := n.updateSessions(); err != nil {
+		t.Fatal(err)
+	}
+	if service.peers["a"] {
+		t.Error("the peer of an hourly session past its paid hours was left connected")
+	}
+	if !service.peers["b"] || !service.peers["c"] {
+		t.Errorf("peers %v: a peer with time left, or without hours, was removed", service.peers)
+	}
+	if got := chain.accepted; len(got) != 3 {
+		t.Errorf("reported %v, want all three: the usage of a session cut off is still paid", got)
+	}
+}
+
+// timedChain is fakeChain with hours: a session it lists carries that
+// max_duration.
+type timedChain struct {
+	*fakeChain
+	hours map[uint64]time.Duration
+}
+
+func (c *timedChain) QuerySession(id uint64) (sessiontypes.Session, error) {
+	s, err := c.fakeChain.QuerySession(id)
+	if s != nil {
+		s.(*nodetypes.Session).MaxDuration = c.hours[id]
+	}
+
+	return s, err
+}
+
 // flaky fails the session query for one id.
 type flaky struct {
 	*fakeChain

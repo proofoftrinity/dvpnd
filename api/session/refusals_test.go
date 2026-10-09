@@ -5,6 +5,7 @@ package session
 import (
 	"encoding/base64"
 	"testing"
+	"time"
 
 	sdkmath "cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -149,6 +150,50 @@ func TestAdmissionEnforcesByteCaps(t *testing.T) {
 			db.Model(&types.Session{}).Where(&types.Session{ID: 1}).First(&item)
 			if item.Available != c.wantAvailable {
 				t.Fatalf("the peer may use %d bytes, want %d", item.Available, c.wantAvailable)
+			}
+		})
+	}
+}
+
+// TestAdmissionEnforcesPaidTime: an hourly session that has used the hours
+// it paid for is refused, the way a session that has used its max_bytes is;
+// one with time left, or a session without hours (a gigabyte session), is
+// admitted and its hours are recorded for the usage pass. The chain pays an hourly session for the duration the node
+// reports, up to what the client deposited for its hours, so time served
+// beyond them is never paid.
+//
+// Rules: [SL-17].
+func TestAdmissionEnforcesPaidTime(t *testing.T) {
+	for _, c := range []struct {
+		name      string
+		max, used time.Duration // the session's max_duration and the duration the chain holds
+		refused   bool
+	}{
+		{"hourly session at its paid time", time.Hour, time.Hour, true},
+		{"hourly session past its paid time", time.Hour, time.Hour + 5*time.Minute, true},
+		{"hourly session with time left", 2 * time.Hour, 30 * time.Minute, false},
+		{"session without hours", 0, 5 * time.Hour, false},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			ctx, service, db, account := admissionRig(t, 50)
+			b := baseSession(1, account.String(), ctx.Address().String())
+			b.MaxDuration, b.Duration = c.max, c.used
+
+			_, apiErr := admit(ctx, &scriptChain{session: nodeSession(b)},
+				admitRequest{AccAddress: account, ID: 1, PeerData: randomBytes(t, 32)})
+			if c.refused {
+				if apiErr == nil || apiErr.Code != 8 || service.PeerCount() != 0 {
+					t.Fatalf("got %v with %d peers, want a refusal with code 8 and no peer", apiErr, service.PeerCount())
+				}
+				return
+			}
+			if apiErr != nil || service.PeerCount() != 1 {
+				t.Fatalf("got %v with %d peers, want the peer admitted", apiErr, service.PeerCount())
+			}
+			var item types.Session
+			db.Model(&types.Session{}).Where(&types.Session{ID: 1}).First(&item)
+			if time.Duration(item.MaxDuration) != c.max {
+				t.Fatalf("recorded paid hours %s, want %s", time.Duration(item.MaxDuration), c.max)
 			}
 		})
 	}

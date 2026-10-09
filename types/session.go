@@ -32,6 +32,11 @@ type Session struct {
 	BaseDownload int64
 	BaseUpload   int64
 	BaseDuration int64 // nanoseconds
+	// MaxDuration is the time an hourly session paid for, in nanoseconds; 0
+	// for a session without hours. The chain pays such a session for the
+	// duration the node reports, up to these hours, so time served beyond
+	// them is never paid.
+	MaxDuration int64
 }
 
 // ServedBytes is what this node process has moved for the session: the
@@ -45,6 +50,12 @@ func (s *Session) ServedBytes() int64 {
 // admission plus the time this node has served the peer.
 func (s *Session) Duration() time.Duration {
 	return time.Duration(s.BaseDuration) + s.UpdatedAt.Sub(s.CreatedAt)
+}
+
+// PaidTimeUsed says whether the session has used the hours it paid for once
+// its peer has been served until at; a session without hours never has.
+func (s *Session) PaidTimeUsed(at time.Time) bool {
+	return s.MaxDuration > 0 && time.Duration(s.BaseDuration)+at.Sub(s.CreatedAt) >= time.Duration(s.MaxDuration)
 }
 
 func (s *Session) GetAddress() sdk.AccAddress {

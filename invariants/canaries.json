@@ -128,6 +128,46 @@
       "expect": "--- FAIL"
     },
     {
+      "name": "[SL-17] a peer past its paid hours stays connected",
+      "file": "node/jobs.go",
+      "find": "\t\t} else if item.PaidTimeUsed(time.Now()) {",
+      "replace": "\t\t} else if false {",
+      "run": [
+        "go test -count=1 -run '^TestSetSessionsCutsOffUsedHours$' ./node/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[SL-17] admission does not record the paid hours",
+      "file": "api/session/admit.go",
+      "find": "\t\tMaxDuration:  int64(a.session.GetMaxDuration()),\n",
+      "replace": "",
+      "run": [
+        "go test -count=1 -run '^TestAdmissionEnforcesPaidTime$' ./api/session/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[SL-17] admission takes a session whose paid hours are used",
+      "file": "api/session/admit.go",
+      "find": "\tif max := session.GetMaxDuration(); max > 0 && session.GetDuration() >= max {",
+      "replace": "\tif max := session.GetMaxDuration(); false && max > 0 {",
+      "run": [
+        "go test -count=1 -run '^TestAdmissionEnforcesPaidTime$' ./api/session/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[SL-17] the chain pass ignores the paid hours",
+      "file": "node/jobs.go",
+      "find": "\tif max := session.GetMaxDuration(); max > 0 && item.Duration() >= max {",
+      "replace": "\tif max := session.GetMaxDuration(); false && max > 0 {",
+      "run": [
+        "go test -count=1 -run '^TestUpdateSessionsCutsOffUsedHours$' ./node/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
       "name": "[SL-10] a session the chain deleted keeps its row",
       "file": "node/jobs.go",
       "find": "\t\treturn true, true, true, nil",

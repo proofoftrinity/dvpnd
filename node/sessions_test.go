@@ -8,6 +8,7 @@ import (
 	"sort"
 	"sync"
 	"testing"
+	"time"
 
 	cmtlog "github.com/cometbft/cometbft/libs/log"
 	"gorm.io/driver/sqlite"
@@ -182,5 +183,49 @@ func TestSetSessionsStoresDownloadOnlyUsage(t *testing.T) {
 	}
 	if !service.wasRemoved(key(2)) {
 		t.Error("only the download moved, past the allocation: the peer was left connected")
+	}
+}
+
+// TestSetSessionsCutsOffUsedHours: a peer served the hours its session paid
+// for is removed by the usage pass, which stores its usage first; the time
+// counts what the chain held when the peer was admitted. A peer with time
+// left, or on a session without hours, stays.
+//
+// Rules: [SL-17].
+func TestSetSessionsCutsOffUsedHours(t *testing.T) {
+	since := func(d time.Duration) gorm.Model {
+		at := time.Now().Add(-d)
+		return gorm.Model{CreatedAt: at, UpdatedAt: at}
+	}
+	hour := int64(time.Hour)
+	n, service, db := usageRig(t,
+		[]types.Session{
+			{ID: 1, Key: key(1), Address: "a", MaxDuration: hour, Model: since(61 * time.Minute)},
+			{ID: 2, Key: key(2), Address: "b", MaxDuration: hour, Model: since(30 * time.Minute),
+				BaseDuration: int64(31 * time.Minute)}, // served before a restart
+			{ID: 3, Key: key(3), Address: "c", MaxDuration: 2 * hour, Model: since(61 * time.Minute)},
+			{ID: 4, Key: key(4), Address: "d", Model: since(5 * time.Hour)}, // no hours
+		},
+		types.Peer{Key: key(1), Upload: 10, Download: 20},
+		types.Peer{Key: key(2), Upload: 10, Download: 20},
+		types.Peer{Key: key(3), Upload: 10, Download: 20},
+		types.Peer{Key: key(4), Upload: 10, Download: 20},
+	)
+
+	if err := n.setSessions(); err != nil {
+		t.Fatal(err)
+	}
+
+	if !service.wasRemoved(key(1)) {
+		t.Error("a peer served past its paid hours was left connected")
+	}
+	if !service.wasRemoved(key(2)) {
+		t.Error("a peer past its paid hours with what the chain held was left connected")
+	}
+	if service.wasRemoved(key(3)) || service.wasRemoved(key(4)) {
+		t.Errorf("a peer with time left, or without hours, was removed: %v", service.removed)
+	}
+	if got := row(t, db, 1); got.Upload != 10 || got.Download != 20 {
+		t.Errorf("the usage of the peer cut off was not stored: upload %d download %d", got.Upload, got.Download)
 	}
 }

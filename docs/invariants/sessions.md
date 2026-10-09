@@ -54,3 +54,9 @@ reported, a report refused) or gives clients service nobody pays for. IDs as in
 - **[SL-16] A removed peer is cut off at once and can't come back.** OpenVPN kills the
   client's connection and denies its reconnect; Hysteria kicks it; WireGuard and the
   other proxies drop the peer.
+- **[SL-17] An hourly session's peer is cut off when the hours it paid for are used.**
+  The chain pays such a session for the duration the node reports, up to the hours the
+  client deposited for, so time served beyond them is never paid. Admission refuses a
+  session that has used them and records them; the usage pass removes the peer once
+  they are served, and the pass that asks the chain removes it too, for a row written
+  before the node recorded them. The usage of a peer cut off is still reported.
