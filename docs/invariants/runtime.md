@@ -34,3 +34,6 @@ the node must not leave a tunnel, a rule or a process behind when it stops. IDs 
 - **[RT-10] A command that fails exits with a non-zero status.** The installer runs
   under `set -e`, and systemd and Docker read the status: a failure reported as success
   goes unnoticed, and a node that could not start was logged as "Deactivated successfully".
+- **[RT-11] The installer waits for the package manager rather than failing when it is busy.**
+  A fresh server runs unattended-upgrades in its first minutes, when an operator runs the
+  installer; its first `apt-get` found the lock taken and the install stopped (exit 100).

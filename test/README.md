@@ -46,8 +46,10 @@ not yet.
   link to the account's former name, every protocol in the integration suite,
   the start command stopping the service on every exit, the session database
   opened in one place (`node.OpenDatabase`), the RPC remotes looped over in
-  one place (`lite`'s `eachRemote`) and the node's jobs run by one loop
-  (`runJob`), so their tests cover every caller;
+  one place (`lite`'s `eachRemote`), the node's jobs run by one loop
+  (`runJob`) and every `apt-get` of the installer run by `apt_get`, so their
+  tests cover every caller (the installer's wrapper runs against a fake
+  `apt-get` that reports the lock taken);
 - the same SPDX and `sentinel-go-sdk` checks as shell steps, and
   `docs/provenance/verify-fork.sh`, which also asks apache.org,
   proxy.golang.org and Software Heritage when it can reach them (an

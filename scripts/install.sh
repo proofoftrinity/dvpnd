@@ -177,14 +177,29 @@ ask() {
 
 random_port() { shuf -i 10000-60000 -n 1; }
 
+# apt_get runs apt-get, waiting while another apt run holds the package
+# manager, as unattended-upgrades does in a fresh server's first minutes. apt
+# waits for the dpkg lock itself when told to, but not for the package lists'
+# lock, so update is retried, for up to ten minutes.
+apt_get() {
+  local tries=60 rc
+  while :; do
+    apt-get -o DPkg::Lock::Timeout=600 "$@" && return 0
+    rc=$?
+    [[ "$1" == update ]] && ((--tries > 0)) || return "${rc}"
+    echo "apt-get update failed (another apt run may hold the package lists); retrying in 10 s"
+    sleep 10
+  done
+}
+
 log "Installing packages"
 export DEBIAN_FRONTEND=noninteractive
-apt-get update -qq
-apt-get install -y -qq ca-certificates curl git build-essential jq openssl openssh-client iproute2 iputils-ping iptables >/dev/null
+apt_get update -qq
+apt_get install -y -qq ca-certificates curl git build-essential jq openssl openssh-client iproute2 iputils-ping iptables >/dev/null
 case "${NODE_TYPE}" in
-  wireguard) apt-get install -y -qq wireguard-tools >/dev/null ;;
-  openvpn) apt-get install -y -qq openvpn >/dev/null ;;
-  amneziawg) apt-get install -y -qq bash >/dev/null ;;
+  wireguard) apt_get install -y -qq wireguard-tools >/dev/null ;;
+  openvpn) apt_get install -y -qq openvpn >/dev/null ;;
+  amneziawg) apt_get install -y -qq bash >/dev/null ;;
 esac
 
 # ---------------------------------------------------------------- source
@@ -291,7 +306,7 @@ case "${NODE_TYPE}" in
       log "Installing xray ${XRAY_VERSION}"
       curl -fsSL -o /tmp/xray.zip "https://github.com/XTLS/Xray-core/releases/download/${XRAY_VERSION}/Xray-linux-64.zip"
       echo "${XRAY_SHA256}  /tmp/xray.zip" | sha256sum -c - >/dev/null
-      apt-get install -y -qq unzip >/dev/null
+      apt_get install -y -qq unzip >/dev/null
       rm -rf /tmp/xray && unzip -q /tmp/xray.zip xray -d /tmp/xray
       install -m 0755 /tmp/xray/xray /usr/local/bin/xray && rm -rf /tmp/xray /tmp/xray.zip
     fi
@@ -482,7 +497,7 @@ chmod 600 "${NODE_HOME}/tls.key"
 
 if [[ "${FIREWALL}" -eq 1 ]]; then
   log "Opening the firewall (ufw)"
-  apt-get install -y -qq ufw >/dev/null
+  apt_get install -y -qq ufw >/dev/null
   ssh_port=$(awk 'tolower($1) == "port" { print $2; exit }' /etc/ssh/sshd_config 2>/dev/null || true)
   ufw allow "${ssh_port:-22}/tcp" >/dev/null
   ufw allow "${API_PORT}/tcp" >/dev/null
