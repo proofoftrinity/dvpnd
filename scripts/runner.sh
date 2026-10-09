@@ -103,12 +103,6 @@ function cmd_init {
         echo "${name}"
     }
 
-    function query_min_price {
-      curl -fsSL "https://lcd.sentinel.co/cosmos/params/v1beta1/params?key=MinPrice&subspace=vpn/node" |
-        jq -r '.param.value' |
-        jq -r 'to_entries | sort_by(.value.denom) | map(.value.amount + .value.denom) | join(",")'
-    }
-
     function cmd_help {
       echo "Usage: ${0} init config COMMAND OPTIONS"
       echo ""
@@ -137,8 +131,9 @@ function cmd_init {
     local node_ipv4_address=
     local node_listen_on="0.0.0.0:${PORTS[0]}"
     local node_moniker && node_moniker=$(generate_moniker)
-    local node_price && node_price=$(query_min_price)
-    local node_provider=
+    # The installer's default prices.
+    local node_gigabyte_prices="40000000udvpn"
+    local node_hourly_prices="97500000udvpn"
     local node_remote_url="https://${PUBLIC_IP}:${PORTS[0]}"
     local node_type="${NODE_TYPE}"
 
@@ -169,13 +164,13 @@ function cmd_init {
     [[ -n "${input}" ]] && node_moniker="${input}"
     config_set "node.moniker" "${node_moniker}"
 
-    read -p "Enter node_price [${node_price}]:" -r input
-    [[ -n "${input}" ]] && node_price="${input}"
-    config_set "node.price" "${node_price}"
+    read -p "Enter node_gigabyte_prices [${node_gigabyte_prices}]:" -r input
+    [[ -n "${input}" ]] && node_gigabyte_prices="${input}"
+    config_set "node.gigabyte_prices" "${node_gigabyte_prices}"
 
-    read -p "Enter node_provider:" -r input
-    [[ -n "${input}" ]] && node_provider="${input}"
-    config_set "node.provider" "${node_provider}"
+    read -p "Enter node_hourly_prices [${node_hourly_prices}]:" -r input
+    [[ -n "${input}" ]] && node_hourly_prices="${input}"
+    config_set "node.hourly_prices" "${node_hourly_prices}"
 
     read -p "Enter node_remote_url [${node_remote_url}]:" -r input
     [[ -n "${input}" ]] && node_remote_url="${input}"
