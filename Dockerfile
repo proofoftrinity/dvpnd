@@ -1,6 +1,6 @@
 # Base images are pinned by digest (Dependabot moves the pins), so a tag
 # re-pointed upstream cannot change what is built.
-FROM golang:1.27-alpine3.23@sha256:0908ac9b9319e09d7c238aabe914e0395c51d63c4e3d0ae8c554fda9158a5769 AS build
+FROM golang:1.27-alpine3.23@sha256:9e45f0eb4a63ed37ad6e604950407558b7c738e34e015ae77a5d4ad369cde079 AS build
 
 # Proxy binaries the node drives, pinned to the releases the client apps are
 # tested against and checked against the sha256 the project publishes.
